@@ -1,9 +1,11 @@
-import { useState } from 'react'
 import './App.css'
-import { Button } from './components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card } from "@/components/ui/card"
+import DeepLearning from './model-cards/deeplearning'
+import Traditional from './model-cards/traditional'
+import Mean from './model-cards/mean'
 
 function App() {
-  const [count, setCount] = useState(0)
 
   return (
     <>
@@ -15,21 +17,35 @@ function App() {
       <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
         Super catchy tagline!
       </h1>
-      <p className="leading-7 [&:not(:first-child)]:mt-6">
+      <p className="leading-7 [&:not(:first-child)]:mt-6 m-6 sm:m-6">
         Once upon a time, in a far-off land, there was a very lazy king who
         spent all day lounging on his throne. One day, his advisors came to him
         with a problem: the kingdom was running out of money (insert description)
       </p>
+      <Tabs defaultValue="mean">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="mean">Mean model</TabsTrigger>
+          <TabsTrigger value="traditional">Traditional Model</TabsTrigger>
+          <TabsTrigger value="deep-learning">Deep Learning Model</TabsTrigger>
+        </TabsList>
+        <TabsContent value="mean">
+          <Card className="p-20">
+            <Mean />
+          </Card>
+        </TabsContent>
+        <TabsContent value="traditional">
+          <Card className="p-20">
+            <Traditional />
+          </Card>
+        </TabsContent>
+        <TabsContent value="deep-learning">
+          <Card className="p-20">
+            <DeepLearning />
+          </Card>
+        </TabsContent>
+      </Tabs>
       </div>
-      <h1>AppName</h1>
-      <div className='card'>
-        <button onClick={() => setCount(count => count + 1)}>count is {count}</button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className='read-the-docs'>Click on the Vite and React logos to learn more</p>
-      <Button className="w-xl">Test me</Button>
+
 
       </main>
 
