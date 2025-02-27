@@ -12,3 +12,12 @@ npm install
 npm run dev
 ```
 - The application is then hosted on `localhost:5173`
+
+
+- Backend
+```
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+fastapi dev main.py
+```
