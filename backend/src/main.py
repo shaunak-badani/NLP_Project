@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.chunking import chunk_by_sentence, chunk_by_paragraph, chunk_by_page, chunk_by_tokens
 import os
 import json
+from src.embedding import get_embeddings
 
 app = FastAPI(root_path='/api')
 
@@ -74,34 +75,8 @@ async def upload_pdf(
         elif chunking_strategy == "tokens":
             chunks = chunk_by_tokens(full_text, token_size=token_size)
 
-        if embedding_model == "sentence-transformer":
-            embeddings = []
-            pass
-        elif embedding_model == "bert":
-            embeddings = []
-            pass
-        elif embedding_model == "roberta":
-            embeddings = []
-            pass
-        elif embedding_model == "distilbert":
-            embeddings = []
-            pass
-        elif embedding_model == "gpt2":
-            embeddings = []
-            pass
-        elif embedding_model == "fasttext":
-            embeddings = []
-            pass
-        elif embedding_model == "use":
-            embeddings = []
-            pass
-        elif embedding_model == "t5":
-            embeddings = []
-            pass
-        else:
-            embeddings = []
+        embeddings = get_embeddings(chunks, embedding_model)
 
-        
         # Store the document and chunks
         current_document["text"] = full_text
         current_document["pages"] = pages

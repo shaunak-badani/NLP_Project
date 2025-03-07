@@ -135,9 +135,6 @@ const DeepLearning = () => {
                                 <SelectItem value="roberta">RoBERTa (roberta-base)</SelectItem>
                                 <SelectItem value="distilbert">DistilBERT (distilbert-base-uncased)</SelectItem>
                                 <SelectItem value="gpt2">GPT-2 (gpt2)</SelectItem>
-                                <SelectItem value="fasttext">FastText (fasttext)</SelectItem>
-                                <SelectItem value="use">Universal Sentence Encoder (use-large)</SelectItem>
-                                <SelectItem value="t5">T5 (t5-base)</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
