@@ -1,9 +1,5 @@
 from sentence_transformers import SentenceTransformer
 from transformers import BertModel, BertTokenizer, RobertaModel, RobertaTokenizer, DistilBertModel, DistilBertTokenizer, GPT2Model, GPT2Tokenizer, T5Tokenizer, T5Model
-import torch
-import numpy as np
-import os
-import json
 
 # Load models globally to avoid reloading per request
 sentence_transformer = SentenceTransformer("all-MiniLM-L6-v2")

@@ -14,6 +14,7 @@ const DeepLearning = () => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [chunkingStrategy, setChunkingStrategy] = useState("sentence");
     const [embeddingModel, setEmbeddingModel] = useState("sentence-transformer");
+    const [similarityMetric, setsimilarityMetric] = useState("cosine");
     const [uploadStatus, setUploadStatus] = useState("");
     const [tokenSize, setTokenSize] = useState(256);
 
@@ -55,6 +56,7 @@ const DeepLearning = () => {
             formData.append("token_size", tokenSize.toString());
         }
         formData.append("embedding_model", embeddingModel);
+        formData.append("similarity_metric", similarityMetric);
 
         try {
             const response = await axios.post("http://localhost:8000/api/upload-pdf", formData, {
@@ -135,6 +137,23 @@ const DeepLearning = () => {
                                 <SelectItem value="roberta">RoBERTa (roberta-base)</SelectItem>
                                 <SelectItem value="distilbert">DistilBERT (distilbert-base-uncased)</SelectItem>
                                 <SelectItem value="gpt2">GPT-2 (gpt2)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div>
+                        <Label htmlFor="similarity-metric" className="block mb-2">Similarity Metric</Label>
+                        <Select 
+                            value={similarityMetric} 
+                            onValueChange={setsimilarityMetric}
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select similarity metric" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="cosine">Cosine Similarity</SelectItem>
+                                <SelectItem value="euclidean">Euclidean Similarity</SelectItem>
+                                <SelectItem value="jaccard">Jaccard Similarity</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

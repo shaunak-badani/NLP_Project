@@ -5,7 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.chunking import chunk_by_sentence, chunk_by_paragraph, chunk_by_page, chunk_by_tokens
 import os
 import json
+import numpy as np
 from src.embedding import get_embeddings
+from src.similarity_metrics import get_similarity_scores, get_top_k_chunks
+from src.utils import format_context_for_llm, generate_llm_response
 
 app = FastAPI(root_path='/api')
 
@@ -32,7 +35,8 @@ current_document = {
     "chunks": [],
     "chunking_strategy": "",
     "embedding_model": "",
-    "embeddings": []
+    "embeddings": [],
+    "similarity_metric": "",
 }
 
 @app.get("/")
@@ -45,6 +49,7 @@ async def upload_pdf(
     chunking_strategy: str = Form(...),
     token_size: int = Form(256),
     embedding_model: str = Form(...),
+    similarity_metric: str = Form(...),
 ):
     """
     Upload a PDF file and chunk it according to the specified strategy
@@ -77,13 +82,17 @@ async def upload_pdf(
 
         embeddings = get_embeddings(chunks, embedding_model)
 
+        print(len(chunks))
+        print(len(embeddings))
+
         # Store the document and chunks
         current_document["text"] = full_text
         current_document["pages"] = pages
         current_document["chunks"] = chunks
         current_document["chunking_strategy"] = chunking_strategy
         current_document["embedding_model"] = embedding_model
-        current_document["embeddings"] = []
+        current_document["embeddings"] = embeddings
+        current_document["similarity_metric"] = similarity_metric
         
         # Save to disk for persistence
         with open("data/current_document.json", "w") as f:
@@ -92,14 +101,15 @@ async def upload_pdf(
                 "chunking_strategy": chunking_strategy,
                 "chunk_count": len(chunks),
                 "token_size": token_size if chunking_strategy == "tokens" else None,
-                "embedding_model": embedding_model
+                "embedding_model": embedding_model,
+                "similarity_metric": similarity_metric,
             }
             json.dump(doc_data, f)
 
 
         with open("data/chunk_embeddings.json", "w") as f:
             # dump chunk as well as its embeddings
-            chunk_embeddings = [{"chunk": chunk, "embeddings": embeddings} for chunk in chunks]
+            chunk_embeddings = [{"chunk": chunk, "embeddings": embedding} for chunk, embedding in zip(chunks, embeddings)]
             json.dump(chunk_embeddings, f)
 
         
@@ -109,7 +119,7 @@ async def upload_pdf(
         }
     
     except Exception as e:
-        return {"error": str(e)}
+        return {"message": str(e)}
 
 @app.get("/mean")
 def query_mean_model(query: str):
@@ -137,16 +147,38 @@ def query_deep_learning_model(query: str):
     if not current_document["chunks"]:
         return {"answer": "Please upload a document first."}
     
-    # TO DO
-    # Get embeddings for the query
-    # Compare with embeddings of chunks
-    # Retrieve relevant chunks
-    # Make call to LLM and Format response
+    try:
+        # Get embeddings for the query using the same model as the chunks
+        query_embedding = get_embeddings([query], current_document["embedding_model"])[0]
+        
+        # Calculate similarity scores based on selected metric
+        similarity_scores = get_similarity_scores(
+            query_embedding, 
+            current_document["embeddings"], 
+            current_document["similarity_metric"]
+        )
+        
+        # Get top 5 most relevant chunks
+        top_chunks = get_top_k_chunks(
+            current_document["chunks"], 
+            similarity_scores, 
+            k=5
+        )
+        
+        top_chunk_texts = [chunk for chunk, score in top_chunks]
+        context = format_context_for_llm(top_chunk_texts)
+        llm_response = generate_llm_response(query, context)
+        
+        # Create a detailed answer with retrieved chunks and LLM response
+        answer = llm_response
+        
+        # answer += "--- Top Relevant Sections ---\n"
+        # for i, (chunk, score) in enumerate(top_chunks, 1):
+        #     # Truncate very long chunks for display
+        #     display_chunk = chunk[:150] + "..." if len(chunk) > 150 else chunk
+        #     answer += f"{i}. Relevance: {score:.4f}\n{display_chunk}\n\n"
+            
+        return {"answer": answer}
     
-    chunk_count = len(current_document["chunks"])
-    strategy = current_document["chunking_strategy"]
-    
-    answer = f"Query: '{query}' processed against {chunk_count} chunks using {strategy} chunking strategy.\n\n"
-    answer += "This would normally return relevant chunks and analysis based on semantic similarity."
-    
-    return {"answer": answer}
+    except Exception as e:
+        return {"answer": f"Error processing your query: {str(e)}"}
