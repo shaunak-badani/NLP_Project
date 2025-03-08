@@ -6,8 +6,8 @@ from src.chunking import chunk_by_sentence, chunk_by_paragraph, chunk_by_page, c
 import os
 import json
 import numpy as np
-from src.embedding import get_embeddings
-from src.similarity_metrics import get_similarity_scores, get_top_k_chunks
+from src.embedding import EmbeddingGenerator
+from src.similarity_metrics import SimilarityCalculator
 from src.utils import format_context_for_llm, generate_llm_response
 
 app = FastAPI(root_path='/api')
@@ -80,7 +80,7 @@ async def upload_pdf(
         elif chunking_strategy == "tokens":
             chunks = chunk_by_tokens(full_text, token_size=token_size)
 
-        embeddings = get_embeddings(chunks, embedding_model)
+        embeddings = EmbeddingGenerator.get_embeddings(chunks, embedding_model)
 
         print(len(chunks))
         print(len(embeddings))
@@ -149,17 +149,17 @@ def query_deep_learning_model(query: str):
     
     try:
         # Get embeddings for the query using the same model as the chunks
-        query_embedding = get_embeddings([query], current_document["embedding_model"])[0]
+        query_embedding = EmbeddingGenerator.get_embeddings([query], current_document["embedding_model"])[0]
         
         # Calculate similarity scores based on selected metric
-        similarity_scores = get_similarity_scores(
+        similarity_scores = SimilarityCalculator.get_similarity_scores(
             query_embedding, 
             current_document["embeddings"], 
             current_document["similarity_metric"]
         )
         
         # Get top 5 most relevant chunks
-        top_chunks = get_top_k_chunks(
+        top_chunks = SimilarityCalculator.get_top_k_chunks(
             current_document["chunks"], 
             similarity_scores, 
             k=5
