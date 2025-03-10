@@ -17,6 +17,10 @@ const DeepLearning = () => {
     const [similarityMetric, setsimilarityMetric] = useState("cosine");
     const [uploadStatus, setUploadStatus] = useState("");
     const [tokenSize, setTokenSize] = useState(256);
+    const [dimReduction, setdimReduction] = useState("pca");
+    const [visualizationImage, setVisualizationImage] = useState<string | null>(null);
+    const [visualizationStatus, setVisualizationStatus] = useState("");
+
 
     const handlePromptInput = async(query: string) => {
         setLoading(true);
@@ -68,6 +72,50 @@ const DeepLearning = () => {
         } catch (error) {
             setUploadStatus("Error uploading file. Please try again.");
             console.error("Error:", error);
+        }
+        setLoading(false);
+    }
+
+    const handleVisualization = async() => {
+        setLoading(true);
+        try {
+            const response = await axios.get("http://localhost:8000/api/visualize-embeddings", {
+                params: {
+                    method: dimReduction
+                },
+                responseType: 'json'
+            });
+            
+            if (response.data.error) {
+                setVisualizationStatus(`Visualization Error: ${response.data.error}`);
+            } else if (response.data.image) {
+                // Create a div to display the image
+                setVisualizationImage(response.data.image);
+                const visualizationContainer = document.getElementById('visualization-container');
+                if (visualizationContainer) {
+                    // Clear previous visualization
+                    visualizationContainer.innerHTML = '';
+                    
+                    // Create image element
+                    const img = document.createElement('img');
+                    img.src = response.data.image;
+                    img.alt = `${dimReduction.toUpperCase()} Visualization`;
+                    img.className = 'w-full border rounded-lg';
+                    
+                    // Add to container
+                    visualizationContainer.appendChild(img);
+                } 
+            } 
+            else {
+                setVisualizationStatus("API did not return an image or error message");
+            }
+        } catch (error) {
+            if (error instanceof Error) {
+                setVisualizationStatus(`Error generating visualization: ${error.message}`);
+                console.error("Visualization error:", error);
+            } else {
+                setVisualizationStatus("Unknown error occurred while generating visualization");
+            }
         }
         setLoading(false);
     }
@@ -185,14 +233,67 @@ const DeepLearning = () => {
             </div>
             
             {response.length > 0 && (
-                <div className="p-6 border rounded-lg bg-gray-50">
+                <div className="p-6 border rounded-lg bg-gray-50 mb-6">
                     <h3 className="text-lg font-medium mb-2">Response</h3>
                     <p>{response}</p>
                 </div>
             )}
+
+            {response.length > 0 && (
+                <div className="p-6 border rounded-lg bg-gray-50">
+                    <h3 className="text-lg font-medium mb-2">Visualizations</h3>
+                    <div className="mb-4">
+                        <Label htmlFor="dim-reduction" className="block mb-2">Dimensionality reduction method</Label>
+                        <Select 
+                            value={dimReduction} 
+                            onValueChange={(value) => {
+                                setdimReduction(value);
+                                console.log(`Selected dimensionality reduction: ${value}`);
+                            }}
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select dimensionality reduction" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="pca">PCA</SelectItem>
+                                <SelectItem value="tsne">t-SNE</SelectItem>
+                                <SelectItem value="umap">UMAP</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <Button 
+                        onClick={handleVisualization} 
+                        className="mb-4"
+                        disabled={isLoading}
+                    >
+                        {isLoading ? "Generating..." : `Create visualization`}
+                    </Button>
+
+                    {visualizationStatus.toLowerCase().includes("error") && (
+                        <div className="p-3 rounded-md bg-red-100 text-red-800">
+                            {visualizationStatus}
+                        </div>
+                    )}
+
+                    {visualizationImage && (
+                        <div id="visualization-container" className="mt-4 min-h-[200px] border rounded-lg p-4 bg-white">
+                            <img 
+                                src={visualizationImage} 
+                                alt={`${dimReduction.toUpperCase()} Visualization`} 
+                                className="w-full border rounded-lg"
+                            />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            
             
             {isLoading && <BackdropWithSpinner />}
         </>
+
+        
     )
 };
 
