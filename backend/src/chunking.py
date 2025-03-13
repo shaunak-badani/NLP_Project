@@ -7,22 +7,35 @@ except LookupError:
     nltk.download('punkt')
 import tiktoken
 
-def chunk_by_sentence(text):
-    """Split text into chunks by sentence"""
+def chunk_by_sentence(text, size=1):
+    """Split text into chunks by sentence, with each chunk containing size sentences"""
     sentences = sent_tokenize(text)
-    return sentences
+    chunks = []
+    for i in range(0, len(sentences), size):
+        chunk = " ".join(sentences[i:i + size])
+        chunks.append(chunk)
+    return chunks
 
-def chunk_by_paragraph(text):
-    """Split text into chunks by paragraph"""
+def chunk_by_paragraph(text, size=1):
+    """Split text into chunks by paragraph, with each chunk containing size paragraphs"""
     # Split by double newlines or more to separate paragraphs
     paragraphs = re.split(r'\n\s*\n', text)
     # Filter out empty paragraphs and strip whitespace
     paragraphs = [p.strip() for p in paragraphs if p.strip()]
-    return paragraphs
+    
+    chunks = []
+    for i in range(0, len(paragraphs), size):
+        chunk = "\n\n".join(paragraphs[i:i + size])
+        chunks.append(chunk)
+    return chunks
 
-def chunk_by_page(text, page_texts):
-    """Return chunks by page (using pre-separated page texts)"""
-    return page_texts
+def chunk_by_page(text, page_texts, size=1):
+    """Return chunks by page, with each chunk containing size pages"""
+    chunks = []
+    for i in range(0, len(page_texts), size):
+        chunk = "\n\n".join(page_texts[i:i + size])
+        chunks.append(chunk)
+    return chunks
 
 def num_tokens_from_string(string: str, encoding_name: str = "cl100k_base") -> int:
     """Returns the number of tokens in a text string."""
