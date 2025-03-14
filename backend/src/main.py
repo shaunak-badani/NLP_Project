@@ -46,6 +46,7 @@ current_document = {
 
 query_embedding = []
 similarity_scores = [] 
+llm_response = ""
 
 @app.get("/")
 async def root():
@@ -225,15 +226,16 @@ async def visualize_embeddings(method: str = Query("pca"), k: int = Query(5)):
     try:
         chunks_embs = np.array(current_document["embeddings"])
         query_emb = np.array(query_embedding)
+        response_emb = EmbeddingGenerator.get_embeddings([llm_response], current_document["embedding_model"])[0]
 
         top_chunk_indices = np.argsort(similarity_scores)[-k:] + 1  
 
         if method.lower() == "pca":
-            img_base64 = PCA_visualization(chunks_embs, query_emb, top_chunk_indices)
+            img_base64 = PCA_visualization(chunks_embs, query_emb, response_emb, top_chunk_indices)
         elif method.lower() == "tsne":
-            img_base64 = tSNE_visualization(chunks_embs, query_emb, top_chunk_indices)
+            img_base64 = tSNE_visualization(chunks_embs, query_emb, response_emb, top_chunk_indices)
         elif method.lower() == "umap":
-            img_base64 = UMAP_visualization(chunks_embs, query_emb, top_chunk_indices)
+            img_base64 = UMAP_visualization(chunks_embs, query_emb, response_emb, top_chunk_indices)
         else:
             return {"error": "Invalid visualization method"}
 

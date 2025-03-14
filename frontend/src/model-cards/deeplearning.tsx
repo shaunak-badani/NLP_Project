@@ -345,37 +345,7 @@ const DeepLearning = () => {
         {response && (
             <div className="p-6 border rounded-lg bg-gray-50">
                 <h3 className="text-lg font-medium mb-2">Visualizations</h3>
-
-                {/* <div className="mb-4"> */}
-                    {/* <h4 className="text-sm font-medium mb-2">Dimensionality Reduction Methods</h4>
-                    <div className="flex space-x-4">
-                        <div className="w-1/3">
-                            <img 
-                                src="path/to/pca_plot.png" 
-                                alt="PCA Visualization" 
-                                className="w-full border rounded-lg"
-                            />
-                            <p className="text-center mt-2">PCA</p>
-                        </div>
-                        <div className="w-1/3">
-                            <img 
-                                src="path/to/tsne_plot.png" 
-                                alt="t-SNE Visualization" 
-                                className="w-full border rounded-lg"
-                            />
-                            <p className="text-center mt-2">t-SNE</p>
-                        </div>
-                        <div className="w-1/3">
-                            <img 
-                                src="path/to/umap_plot.png" 
-                                alt="UMAP Visualization" 
-                                className="w-full border rounded-lg"
-                            />
-                            <p className="text-center mt-2">UMAP</p>
-                        </div>
-                    </div>
-                </div> */}
-
+                
                 <Button 
                     onClick={handleVisualization} 
                     className="mb-4"
@@ -390,34 +360,7 @@ const DeepLearning = () => {
                     </div>
                 )}
 
-                {/* {visualizationImage && (
-                    <>
-                        <div id="visualization-container" className="mt-4 min-h-[200px] border rounded-lg p-4 bg-white">
-                            <img 
-                                src={visualizationImagePCA} 
-                                alt={`PCA Visualization`} 
-                                className="w-full border rounded-lg"
-                            />
-                        </div>
-
-                        <div id="visualization-container" className="mt-4 min-h-[200px] border rounded-lg p-4 bg-white">
-                            <img 
-                                src={visualizationImageTSNE} 
-                                alt={`$TSNE Visualization`} 
-                                className="w-full border rounded-lg"
-                            />
-                        </div>
-
-                        <div id="visualization-container" className="mt-4 min-h-[200px] border rounded-lg p-4 bg-white">
-                            <img 
-                                src={visualizationImageUMAP} 
-                                alt={`UMAP Visualization`} 
-                                className="w-full border rounded-lg"
-                            />
-                        </div> */}
-                    {/* </>
-                )} */}
-
+                
                 {visualizationImagePCA && (
                     <div id="visualization-container" className="mt-4 min-h-[200px] border rounded-lg p-4 bg-white">
                         <img 

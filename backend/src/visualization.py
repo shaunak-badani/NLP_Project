@@ -10,7 +10,10 @@ def plot_embeddings_multi(embeddings_2d, top_chunk_indices, title, x_axis_label,
     plt.figure(figsize=(8, 6))
     
     # Plot query embedding
-    plt.scatter(embeddings_2d[0, 0], embeddings_2d[0, 1], color='red', marker='*', s=150, label="Query Embedding")
+    plt.scatter(embeddings_2d[-2, 0], embeddings_2d[-2, 1], color='red', marker='*', s=150, label="Query Embedding")
+
+    # Plot response embedding
+    plt.scatter(embeddings_2d[-1, 0], embeddings_2d[-1, 1], color='yellow', marker='*', s=150, label="Response Embedding")
     
     # Plot top relevant chunks in green
     top_points = embeddings_2d[top_chunk_indices]
@@ -21,7 +24,7 @@ def plot_embeddings_multi(embeddings_2d, top_chunk_indices, title, x_axis_label,
         plt.text(top_points[i, 0], top_points[i, 1], f"Chunk {idx}", color='black', fontsize=9, ha='left', va='center')
 
     # Plot other chunk embeddings in blue
-    all_indices = set(range(1, len(embeddings_2d)))
+    all_indices = set(range(0, len(embeddings_2d)-2))
     non_top_indices = list(all_indices - set(top_chunk_indices))
     output_points = embeddings_2d[non_top_indices]
     plt.scatter(output_points[:, 0], output_points[:, 1], color='blue', alpha=0.7, label="Chunk Embeddings")
@@ -42,17 +45,17 @@ def plot_embeddings_multi(embeddings_2d, top_chunk_indices, title, x_axis_label,
 
     return img_base64
 
-def PCA_visualization(chunks_embs, query_emb, top_indices):
+def PCA_visualization(chunks_embs, query_emb, response_emb, top_indices):
     pca = PCA(n_components=2)
-    embeddings_2d = pca.fit_transform(np.vstack([query_emb, chunks_embs]))
+    embeddings_2d = pca.fit_transform(np.vstack([chunks_embs, query_emb, response_emb]))
     return plot_embeddings_multi(embeddings_2d, top_indices, "PCA Projection", "PCA Component 1", "PCA Component 2")
 
-def tSNE_visualization(chunks_embs, query_emb, top_indices):
+def tSNE_visualization(chunks_embs, query_emb, response_emb, top_indices):
     tsne = TSNE(n_components=2, perplexity=min(30, max(1, len(chunks_embs) // 3)), random_state=42)
-    embeddings_2d = tsne.fit_transform(np.vstack([query_emb, chunks_embs]))
+    embeddings_2d = tsne.fit_transform(np.vstack([chunks_embs, query_emb, response_emb]))
     return plot_embeddings_multi(embeddings_2d, top_indices, "t-SNE Projection", "t-SNE Component 1", "t-SNE Component 2")
 
-def UMAP_visualization(chunks_embs, query_emb, top_indices):
+def UMAP_visualization(chunks_embs, query_emb, response_emb, top_indices):
     reducer = umap.UMAP(n_components=2, n_neighbors=min(15, len(chunks_embs) - 1), min_dist=0.1, metric='euclidean', random_state=42)
-    embeddings_2d = reducer.fit_transform(np.vstack([query_emb, chunks_embs]))
+    embeddings_2d = reducer.fit_transform(np.vstack([chunks_embs, query_emb, response_emb]))
     return plot_embeddings_multi(embeddings_2d, top_indices, "UMAP Projection", "UMAP Component 1", "UMAP Component 2")
