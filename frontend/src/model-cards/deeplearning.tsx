@@ -34,7 +34,10 @@ const DeepLearning = () => {
     const [paragraphSize, setParagraphSize] = useState(1);
     const [pageSize, setPageSize] = useState(1);
     const [dimReduction, setdimReduction] = useState("pca");
-    const [visualizationImage, setVisualizationImage] = useState<string | null>(null);
+    const [visualizationImagePCA, setVisualizationImagePCA] = useState<string | null>(null);
+    const [visualizationImageTSNE, setVisualizationImageTSNE] = useState<string | null>(null);
+    const [visualizationImageUMAP, setVisualizationImageUMAP] = useState<string | null>(null);
+
     const [visualizationStatus, setVisualizationStatus] = useState("");
 
 
@@ -99,38 +102,33 @@ const DeepLearning = () => {
         setLoading(false);
     }
 
-    const handleVisualization = async() => {
+    const handleVisualization = async () => {
         setLoading(true);
         try {
-            const response = await axios.get("http://localhost:8000/api/visualize-embeddings", {
-                params: {
-                    method: dimReduction
-                },
-                responseType: 'json'
+            // Call the API for PCA, t-SNE, and UMAP visualizations separately
+            const pcaResponse = await axios.get("http://localhost:8000/api/visualize-embeddings", {
+                params: { method: "pca", k: numChunks }, 
+                responseType: 'json',
             });
-            
-            if (response.data.error) {
-                setVisualizationStatus(`Visualization Error: ${response.data.error}`);
-            } else if (response.data.image) {
-                // Create a div to display the image
-                setVisualizationImage(response.data.image);
-                const visualizationContainer = document.getElementById('visualization-container');
-                if (visualizationContainer) {
-                    // Clear previous visualization
-                    visualizationContainer.innerHTML = '';
-                    
-                    // Create image element
-                    const img = document.createElement('img');
-                    img.src = response.data.image;
-                    img.alt = `${dimReduction.toUpperCase()} Visualization`;
-                    img.className = 'w-full border rounded-lg';
-                    
-                    // Add to container
-                    visualizationContainer.appendChild(img);
-                } 
-            } 
-            else {
-                setVisualizationStatus("API did not return an image or error message");
+    
+            const tsneResponse = await axios.get("http://localhost:8000/api/visualize-embeddings", {
+                params: { method: "tsne", k: numChunks }, 
+                responseType: 'json',
+            });
+    
+            const umapResponse = await axios.get("http://localhost:8000/api/visualize-embeddings", {
+                params: { method: "umap", k: numChunks }, 
+                responseType: 'json',
+            });
+    
+            // Check if there are errors in any of the responses
+            if (pcaResponse.data.error || tsneResponse.data.error || umapResponse.data.error) {
+                setVisualizationStatus("Error generating visualizations.");
+            } else {
+                // Set state for each visualization
+                setVisualizationImagePCA(pcaResponse.data.image);
+                setVisualizationImageTSNE(tsneResponse.data.image);
+                setVisualizationImageUMAP(umapResponse.data.image);
             }
         } catch (error) {
             if (error instanceof Error) {
@@ -141,8 +139,8 @@ const DeepLearning = () => {
             }
         }
         setLoading(false);
-    }
-
+    };
+    
     return (
         <>
             <div className="mb-8 p-6 border rounded-lg">
@@ -344,54 +342,115 @@ const DeepLearning = () => {
                 </div>
             )}
 
-            {response && (
-                <div className="p-6 border rounded-lg bg-gray-50">
-                    <h3 className="text-lg font-medium mb-2">Visualizations</h3>
-                    <div className="mb-4">
-                        <Label htmlFor="dim-reduction" className="block mb-2">Dimensionality reduction method</Label>
-                        <Select 
-                            value={dimReduction} 
-                            onValueChange={(value) => {
-                                setdimReduction(value);
-                                console.log(`Selected dimensionality reduction: ${value}`);
-                            }}
-                        >
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Select dimensionality reduction" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="pca">PCA</SelectItem>
-                                <SelectItem value="tsne">t-SNE</SelectItem>
-                                <SelectItem value="umap">UMAP</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+        {response && (
+            <div className="p-6 border rounded-lg bg-gray-50">
+                <h3 className="text-lg font-medium mb-2">Visualizations</h3>
 
-                    <Button 
-                        onClick={handleVisualization} 
-                        className="mb-4"
-                        disabled={isLoading}
-                    >
-                        {isLoading ? "Generating..." : `Create visualization`}
-                    </Button>
-
-                    {visualizationStatus.toLowerCase().includes("error") && (
-                        <div className="p-3 rounded-md bg-red-100 text-red-800">
-                            {visualizationStatus}
+                {/* <div className="mb-4"> */}
+                    {/* <h4 className="text-sm font-medium mb-2">Dimensionality Reduction Methods</h4>
+                    <div className="flex space-x-4">
+                        <div className="w-1/3">
+                            <img 
+                                src="path/to/pca_plot.png" 
+                                alt="PCA Visualization" 
+                                className="w-full border rounded-lg"
+                            />
+                            <p className="text-center mt-2">PCA</p>
                         </div>
-                    )}
+                        <div className="w-1/3">
+                            <img 
+                                src="path/to/tsne_plot.png" 
+                                alt="t-SNE Visualization" 
+                                className="w-full border rounded-lg"
+                            />
+                            <p className="text-center mt-2">t-SNE</p>
+                        </div>
+                        <div className="w-1/3">
+                            <img 
+                                src="path/to/umap_plot.png" 
+                                alt="UMAP Visualization" 
+                                className="w-full border rounded-lg"
+                            />
+                            <p className="text-center mt-2">UMAP</p>
+                        </div>
+                    </div>
+                </div> */}
 
-                    {visualizationImage && (
+                <Button 
+                    onClick={handleVisualization} 
+                    className="mb-4"
+                    disabled={isLoading}
+                >
+                    {isLoading ? "Generating..." : `Create visualization`}
+                </Button>
+
+                {visualizationStatus.toLowerCase().includes("error") && (
+                    <div className="p-3 rounded-md bg-red-100 text-red-800">
+                        {visualizationStatus}
+                    </div>
+                )}
+
+                {/* {visualizationImage && (
+                    <>
                         <div id="visualization-container" className="mt-4 min-h-[200px] border rounded-lg p-4 bg-white">
                             <img 
-                                src={visualizationImage} 
-                                alt={`${dimReduction.toUpperCase()} Visualization`} 
+                                src={visualizationImagePCA} 
+                                alt={`PCA Visualization`} 
                                 className="w-full border rounded-lg"
                             />
                         </div>
-                    )}
-                </div>
-            )}
+
+                        <div id="visualization-container" className="mt-4 min-h-[200px] border rounded-lg p-4 bg-white">
+                            <img 
+                                src={visualizationImageTSNE} 
+                                alt={`$TSNE Visualization`} 
+                                className="w-full border rounded-lg"
+                            />
+                        </div>
+
+                        <div id="visualization-container" className="mt-4 min-h-[200px] border rounded-lg p-4 bg-white">
+                            <img 
+                                src={visualizationImageUMAP} 
+                                alt={`UMAP Visualization`} 
+                                className="w-full border rounded-lg"
+                            />
+                        </div> */}
+                    {/* </>
+                )} */}
+
+                {visualizationImagePCA && (
+                    <div id="visualization-container" className="mt-4 min-h-[200px] border rounded-lg p-4 bg-white">
+                        <img 
+                            src={visualizationImagePCA} 
+                            alt="PCA Visualization" 
+                            className="w-full border rounded-lg"
+                        />
+                    </div>
+                )}
+
+                {visualizationImageTSNE && (
+                    <div id="visualization-container" className="mt-4 min-h-[200px] border rounded-lg p-4 bg-white">
+                        <img 
+                            src={visualizationImageTSNE} 
+                            alt="t-SNE Visualization" 
+                            className="w-full border rounded-lg"
+                        />
+                    </div>
+                )}
+
+                {visualizationImageUMAP && (
+                    <div id="visualization-container" className="mt-4 min-h-[200px] border rounded-lg p-4 bg-white">
+                        <img 
+                            src={visualizationImageUMAP} 
+                            alt="UMAP Visualization" 
+                            className="w-full border rounded-lg"
+                        />
+                    </div>
+                )}
+
+            </div>
+        )}
+
 
             
             

@@ -16,6 +16,10 @@ def plot_embeddings_multi(embeddings_2d, top_chunk_indices, title, x_axis_label,
     top_points = embeddings_2d[top_chunk_indices]
     plt.scatter(top_points[:, 0], top_points[:, 1], color='green', alpha=0.7, label="Top Relevant Chunks")
     
+    # Label each top chunk point
+    for i, idx in enumerate(top_chunk_indices):
+        plt.text(top_points[i, 0], top_points[i, 1], f"Chunk {idx}", color='black', fontsize=9, ha='left', va='center')
+
     # Plot other chunk embeddings in blue
     all_indices = set(range(1, len(embeddings_2d)))
     non_top_indices = list(all_indices - set(top_chunk_indices))
