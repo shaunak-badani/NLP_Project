@@ -2,13 +2,13 @@ from fastapi import FastAPI, File, UploadFile, Form, Query
 import io
 import PyPDF2
 from fastapi.middleware.cors import CORSMiddleware
-from src.chunking import chunk_by_sentence, chunk_by_paragraph, chunk_by_page, chunk_by_tokens
+from chunking import chunk_by_sentence, chunk_by_paragraph, chunk_by_page, chunk_by_tokens
 import os
 import json
 import numpy as np
-from src.embedding import EmbeddingGenerator
-from src.similarity_metrics import SimilarityCalculator
-from src.utils import format_context_for_llm, generate_llm_response
+from embedding import EmbeddingGenerator
+from similarity_metrics import SimilarityCalculator
+from utils import format_context_for_llm, generate_llm_response
 
 app = FastAPI(root_path='/api')
 
