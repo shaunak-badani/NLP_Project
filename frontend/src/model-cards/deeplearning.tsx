@@ -35,6 +35,13 @@ const DeepLearning = () => {
     const [sentenceSize, setSentenceSize] = useState(1);
     const [paragraphSize, setParagraphSize] = useState(1);
     const [pageSize, setPageSize] = useState(1);
+    const [dimReduction, setdimReduction] = useState("pca");
+    const [visualizationImagePCA, setVisualizationImagePCA] = useState<string | null>(null);
+    const [visualizationImageTSNE, setVisualizationImageTSNE] = useState<string | null>(null);
+    const [visualizationImageUMAP, setVisualizationImageUMAP] = useState<string | null>(null);
+
+    const [visualizationStatus, setVisualizationStatus] = useState("");
+
 
     const handlePromptInput = async(query: string) => {
         setLoading(true);
@@ -97,6 +104,45 @@ const DeepLearning = () => {
         setLoading(false);
     }
 
+    const handleVisualization = async () => {
+        setLoading(true);
+        try {
+            // Call the API for PCA, t-SNE, and UMAP visualizations separately
+            const pcaResponse = await axios.get("http://localhost:8000/api/visualize-embeddings", {
+                params: { method: "pca", k: numChunks }, 
+                responseType: 'json',
+            });
+    
+            const tsneResponse = await axios.get("http://localhost:8000/api/visualize-embeddings", {
+                params: { method: "tsne", k: numChunks }, 
+                responseType: 'json',
+            });
+    
+            const umapResponse = await axios.get("http://localhost:8000/api/visualize-embeddings", {
+                params: { method: "umap", k: numChunks }, 
+                responseType: 'json',
+            });
+    
+            // Check if there are errors in any of the responses
+            if (pcaResponse.data.error || tsneResponse.data.error || umapResponse.data.error) {
+                setVisualizationStatus("Error generating visualizations.");
+            } else {
+                // Set state for each visualization
+                setVisualizationImagePCA(pcaResponse.data.image);
+                setVisualizationImageTSNE(tsneResponse.data.image);
+                setVisualizationImageUMAP(umapResponse.data.image);
+            }
+        } catch (error) {
+            if (error instanceof Error) {
+                setVisualizationStatus(`Error generating visualization: ${error.message}`);
+                console.error("Visualization error:", error);
+            } else {
+                setVisualizationStatus("Unknown error occurred while generating visualization");
+            }
+        }
+        setLoading(false);
+    };
+    
     return (
         <>
             <div className="mb-8 p-6 border rounded-lg">
@@ -306,9 +352,66 @@ const DeepLearning = () => {
                     )}
                 </div>
             )}
+
+        {response && (
+            <div className="p-6 border rounded-lg bg-gray-50">
+                <h3 className="text-lg font-medium mb-2">Visualizations</h3>
+                
+                <Button 
+                    onClick={handleVisualization} 
+                    className="mb-4"
+                    disabled={isLoading}
+                >
+                    {isLoading ? "Generating..." : `Create visualization`}
+                </Button>
+
+                {visualizationStatus.toLowerCase().includes("error") && (
+                    <div className="p-3 rounded-md bg-red-100 text-red-800">
+                        {visualizationStatus}
+                    </div>
+                )}
+
+                
+                {visualizationImagePCA && (
+                    <div id="visualization-container" className="mt-4 min-h-[200px] border rounded-lg p-4 bg-white">
+                        <img 
+                            src={visualizationImagePCA} 
+                            alt="PCA Visualization" 
+                            className="w-full border rounded-lg"
+                        />
+                    </div>
+                )}
+
+                {visualizationImageTSNE && (
+                    <div id="visualization-container" className="mt-4 min-h-[200px] border rounded-lg p-4 bg-white">
+                        <img 
+                            src={visualizationImageTSNE} 
+                            alt="t-SNE Visualization" 
+                            className="w-full border rounded-lg"
+                        />
+                    </div>
+                )}
+
+                {visualizationImageUMAP && (
+                    <div id="visualization-container" className="mt-4 min-h-[200px] border rounded-lg p-4 bg-white">
+                        <img 
+                            src={visualizationImageUMAP} 
+                            alt="UMAP Visualization" 
+                            className="w-full border rounded-lg"
+                        />
+                    </div>
+                )}
+
+            </div>
+        )}
+
+
+            
             
             {isLoading && <BackdropWithSpinner />}
         </>
+
+        
     )
 };
 
