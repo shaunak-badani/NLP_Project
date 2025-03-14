@@ -5,18 +5,34 @@ import { Textarea } from "@/components/ui/textarea";
 import BackdropWithSpinner from "@/components/ui/backdropwithspinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+
+interface Chunk {
+    chunk_number: number;
+    text: string;
+    relevance_score: number;
+}
+
+interface Response {
+    answer: string;
+    chunks: Chunk[];
+}
 
 const DeepLearning = () => {
 
     const [isLoading, setLoading] = useState(false);
     const [query, setQuery] = useState("");
-    const [response, setResponse] = useState("");
+    const [response, setResponse] = useState<Response | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [chunkingStrategy, setChunkingStrategy] = useState("sentence");
     const [embeddingModel, setEmbeddingModel] = useState("sentence-transformer");
     const [similarityMetric, setsimilarityMetric] = useState("cosine");
     const [uploadStatus, setUploadStatus] = useState("");
     const [tokenSize, setTokenSize] = useState(256);
+    const [numChunks, setNumChunks] = useState(5);
+    const [sentenceSize, setSentenceSize] = useState(1);
+    const [paragraphSize, setParagraphSize] = useState(1);
+    const [pageSize, setPageSize] = useState(1);
     const [dimReduction, setdimReduction] = useState("pca");
     const [visualizationImage, setVisualizationImage] = useState<string | null>(null);
     const [visualizationStatus, setVisualizationStatus] = useState("");
@@ -27,12 +43,13 @@ const DeepLearning = () => {
         try {
             const response = await axios.get("http://localhost:8000/api/deep-learning", {
                 params: {
-                    query: query
+                    query: query,
+                    num_chunks: numChunks
                 }
             });
-            setResponse(response.data.answer);
+            setResponse(response.data);
         } catch (error) {
-            setResponse("Error processing your query. Please try again.");
+            setResponse({ answer: "Error processing your query. Please try again.", chunks: [] });
             console.error("Error:", error);
         }
         setLoading(false);
@@ -58,6 +75,12 @@ const DeepLearning = () => {
         
         if (chunkingStrategy === "tokens") {
             formData.append("token_size", tokenSize.toString());
+        } else if (chunkingStrategy === "sentence") {
+            formData.append("sentence_size", sentenceSize.toString());
+        } else if (chunkingStrategy === "paragraph") {
+            formData.append("paragraph_size", paragraphSize.toString());
+        } else if (chunkingStrategy === "page") {
+            formData.append("page_size", pageSize.toString());
         }
         formData.append("embedding_model", embeddingModel);
         formData.append("similarity_metric", similarityMetric);
@@ -170,6 +193,51 @@ const DeepLearning = () => {
                         </div>
                     )}
 
+                    {chunkingStrategy === "sentence" && (
+                        <div>
+                            <Label htmlFor="sentence-size" className="block mb-2">Number of Sentences per Chunk</Label>
+                            <input
+                                id="sentence-size"
+                                type="number"
+                                min="1"
+                                max="10"
+                                value={sentenceSize}
+                                onChange={(e) => setSentenceSize(Number(e.target.value))}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            />
+                        </div>
+                    )}
+
+                    {chunkingStrategy === "paragraph" && (
+                        <div>
+                            <Label htmlFor="paragraph-size" className="block mb-2">Number of Paragraphs per Chunk</Label>
+                            <input
+                                id="paragraph-size"
+                                type="number"
+                                min="1"
+                                max="5"
+                                value={paragraphSize}
+                                onChange={(e) => setParagraphSize(Number(e.target.value))}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            />
+                        </div>
+                    )}
+
+                    {chunkingStrategy === "page" && (
+                        <div>
+                            <Label htmlFor="page-size" className="block mb-2">Number of Pages per Chunk</Label>
+                            <input
+                                id="page-size"
+                                type="number"
+                                min="1"
+                                max="3"
+                                value={pageSize}
+                                onChange={(e) => setPageSize(Number(e.target.value))}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            />
+                        </div>
+                    )}
+
                     <div>
                         <Label htmlFor="embedding-model" className="block mb-2">Embedding Model</Label>
                         <Select 
@@ -206,7 +274,19 @@ const DeepLearning = () => {
                         </Select>
                     </div>
 
-                    
+                    <div>
+                        <Label htmlFor="num-chunks" className="block mb-2">Number of Chunks to Retrieve</Label>
+                        <input
+                            id="num-chunks"
+                            type="number"
+                            min="1"
+                            max="20"
+                            value={numChunks}
+                            onChange={(e) => setNumChunks(Number(e.target.value))}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                    </div>
+
                     <Button onClick={handleFileUpload} className="w-full">
                         Upload and Process
                     </Button>
@@ -219,7 +299,7 @@ const DeepLearning = () => {
                 </div>
             </div>
             
-            <div className="mb-8 p-6 border rounded-lg">
+            <div className="mb-8">
                 <h3 className="text-lg font-medium mb-4">Query Document</h3>
                 <Textarea
                     value={query}
@@ -232,14 +312,39 @@ const DeepLearning = () => {
                 </Button>
             </div>
             
-            {response.length > 0 && (
-                <div className="p-6 border rounded-lg bg-gray-50 mb-6">
-                    <h3 className="text-lg font-medium mb-2">Response</h3>
-                    <p>{response}</p>
+            {response && (
+                <div className="space-y-6">
+                    <div className="p-6 border rounded-lg bg-gray-50">
+                        <h3 className="text-lg font-medium mb-2">Response</h3>
+                        <p>{response.answer}</p>
+                    </div>
+
+                    {response.chunks && response.chunks.length > 0 && (
+                        <div className="p-6 border rounded-lg">
+                            <h3 className="text-lg font-medium mb-4">Relevant Chunks</h3>
+                            <Accordion type="single" collapsible className="w-full">
+                                {response.chunks.map((chunk) => (
+                                    <AccordionItem key={chunk.chunk_number} value={`chunk-${chunk.chunk_number}`}>
+                                        <AccordionTrigger>
+                                            <div className="flex items-center justify-between w-full">
+                                                <span>Chunk {chunk.chunk_number}</span>
+                                                <span className="text-sm text-gray-500">
+                                                    Relevance: {(chunk.relevance_score * 100).toFixed(2)}%
+                                                </span>
+                                            </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent>
+                                            <p className="whitespace-pre-wrap">{chunk.text}</p>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                ))}
+                            </Accordion>
+                        </div>
+                    )}
                 </div>
             )}
 
-            {response.length > 0 && (
+            {response && (
                 <div className="p-6 border rounded-lg bg-gray-50">
                     <h3 className="text-lg font-medium mb-2">Visualizations</h3>
                     <div className="mb-4">

@@ -50,8 +50,12 @@ class SimilarityCalculator:
             return SimilarityCalculator.calculate_cosine_similarity(query_embedding, chunk_embeddings)
 
     @staticmethod
-    def get_top_k_chunks(chunks: List[str], similarity_scores: List[float], k: int = 5) -> List[Tuple[str, float]]:
+    def get_top_k_chunks(chunks: List[str], similarity_scores: List[float], k: int = 5) -> List[Tuple[int, str, float]]:
         """
         Retrieve top k chunks based on similarity scores.
+        Returns a list of tuples containing (original_chunk_index, chunk_text, similarity_score)
         """
-        return sorted(zip(chunks, similarity_scores), key=lambda x: x[1], reverse=True)[:k]
+        # Create list of (index, chunk, score) tuples
+        chunk_data = list(enumerate(zip(chunks, similarity_scores)))
+        # Sort by score in descending order and take top k
+        return sorted(chunk_data, key=lambda x: x[1][1], reverse=True)[:k]
