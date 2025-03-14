@@ -2,13 +2,18 @@ from fastapi import FastAPI, File, UploadFile, Form, Query
 import io
 import PyPDF2
 from fastapi.middleware.cors import CORSMiddleware
-from src.chunking import chunk_by_sentence, chunk_by_paragraph, chunk_by_page, chunk_by_tokens
+from chunking import chunk_by_sentence, chunk_by_paragraph, chunk_by_page, chunk_by_tokens
 import os
 import json
 import numpy as np
-from src.embedding import EmbeddingGenerator
-from src.similarity_metrics import SimilarityCalculator
-from src.utils import format_context_for_llm, generate_llm_response
+from embedding import EmbeddingGenerator
+from similarity_metrics import SimilarityCalculator
+from utils import format_context_for_llm, generate_llm_response
+from visualization import PCA_visualization, tSNE_visualization, UMAP_visualization
+import matplotlib.pyplot as plt
+import base64
+from io import BytesIO
+from fastapi.responses import JSONResponse
 
 app = FastAPI(root_path='/api')
 
@@ -38,6 +43,10 @@ current_document = {
     "embeddings": [],
     "similarity_metric": "",
 }
+
+query_embedding = []
+similarity_scores = [] 
+llm_response = ""
 
 @app.get("/")
 async def root():
@@ -149,6 +158,9 @@ def query_deep_learning_model(query: str, num_chunks: int = 5):
     """
     Query endpoint for the deep learning model
     """
+
+    global query_embedding, similarity_scores
+
     # Check if we have a document loaded
     if not current_document["chunks"]:
         return {"answer": "Please upload a document first."}
@@ -195,3 +207,39 @@ def query_deep_learning_model(query: str, num_chunks: int = 5):
     
     except Exception as e:
         return {"answer": f"Error processing your query: {str(e)}"}
+    
+
+
+@app.get("/visualize-embeddings")
+async def visualize_embeddings(method: str = Query("pca"), k: int = Query(5)):
+    global similarity_scores
+
+    if not current_document["embeddings"]:
+        return {"error": "No document uploaded yet."}
+
+    if not query_embedding:
+        return {"error": "No query embedding available. Send a query first."}
+
+    if not similarity_scores:
+        return {"error": "No similarity scores available. Run a query first."}
+
+    try:
+        chunks_embs = np.array(current_document["embeddings"])
+        query_emb = np.array(query_embedding)
+        response_emb = EmbeddingGenerator.get_embeddings([llm_response], current_document["embedding_model"])[0]
+
+        top_chunk_indices = np.argsort(similarity_scores)[-k:] + 1  
+
+        if method.lower() == "pca":
+            img_base64 = PCA_visualization(chunks_embs, query_emb, response_emb, top_chunk_indices)
+        elif method.lower() == "tsne":
+            img_base64 = tSNE_visualization(chunks_embs, query_emb, response_emb, top_chunk_indices)
+        elif method.lower() == "umap":
+            img_base64 = UMAP_visualization(chunks_embs, query_emb, response_emb, top_chunk_indices)
+        else:
+            return {"error": "Invalid visualization method"}
+
+        return {"image": f"data:image/png;base64,{img_base64}"}
+
+    except Exception as e:
+        return {"error": f"Error generating visualization: {str(e)}"}
