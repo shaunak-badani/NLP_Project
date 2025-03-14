@@ -48,6 +48,9 @@ async def upload_pdf(
     file: UploadFile = File(...),
     chunking_strategy: str = Form(...),
     token_size: int = Form(256),
+    sentence_size: int = Form(1),
+    paragraph_size: int = Form(1),
+    page_size: int = Form(1),
     embedding_model: str = Form(...),
     similarity_metric: str = Form(...),
 ):
@@ -72,18 +75,15 @@ async def upload_pdf(
         # Apply chunking strategy
         chunks = []
         if chunking_strategy == "sentence":
-            chunks = chunk_by_sentence(full_text)
+            chunks = chunk_by_sentence(full_text, size=sentence_size)
         elif chunking_strategy == "paragraph":
-            chunks = chunk_by_paragraph(full_text)
+            chunks = chunk_by_paragraph(full_text, size=paragraph_size)
         elif chunking_strategy == "page":
-            chunks = pages
+            chunks = chunk_by_page(full_text, pages, size=page_size)
         elif chunking_strategy == "tokens":
             chunks = chunk_by_tokens(full_text, token_size=token_size)
 
         embeddings = EmbeddingGenerator.get_embeddings(chunks, embedding_model)
-
-        print(len(chunks))
-        print(len(embeddings))
 
         # Store the document and chunks
         current_document["text"] = full_text
@@ -109,7 +109,13 @@ async def upload_pdf(
 
         with open("data/chunk_embeddings.json", "w") as f:
             # dump chunk as well as its embeddings
-            chunk_embeddings = [{"chunk": chunk, "embeddings": embedding} for chunk, embedding in zip(chunks, embeddings)]
+            chunk_embeddings = []
+            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+                chunk_embeddings.append({
+                    "chunk": chunk,
+                    "chunk_no": i+1,
+                    "embeddings": embedding
+                })
             json.dump(chunk_embeddings, f)
 
         
@@ -139,7 +145,7 @@ def query_traditional_model(query: str):
     return {"answer": answer}
 
 @app.get("/deep-learning")
-def query_deep_learning_model(query: str):
+def query_deep_learning_model(query: str, num_chunks: int = 5):
     """
     Query endpoint for the deep learning model
     """
@@ -158,27 +164,34 @@ def query_deep_learning_model(query: str):
             current_document["similarity_metric"]
         )
         
-        # Get top 5 most relevant chunks
+        # Get top k most relevant chunks based on user input
         top_chunks = SimilarityCalculator.get_top_k_chunks(
             current_document["chunks"], 
             similarity_scores, 
-            k=5
+            k=num_chunks
         )
         
-        top_chunk_texts = [chunk for chunk, score in top_chunks]
+        top_chunk_texts = [chunk for _, (chunk, _) in top_chunks]
         context = format_context_for_llm(top_chunk_texts)
         llm_response = generate_llm_response(query, context)
         
         # Create a detailed answer with retrieved chunks and LLM response
         answer = llm_response
         
-        # answer += "--- Top Relevant Sections ---\n"
-        # for i, (chunk, score) in enumerate(top_chunks, 1):
-        #     # Truncate very long chunks for display
-        #     display_chunk = chunk[:150] + "..." if len(chunk) > 150 else chunk
-        #     answer += f"{i}. Relevance: {score:.4f}\n{display_chunk}\n\n"
+        # Return chunks and their scores along with the answer
+        chunks_data = [
+            {
+                "chunk_number": chunk_idx + 1,  # Add 1 since chunk_idx is 0-based
+                "text": chunk,
+                "relevance_score": float(score)  # Convert numpy float to Python float
+            }
+            for chunk_idx, (chunk, score) in top_chunks
+        ]
             
-        return {"answer": answer}
+        return {
+            "answer": answer,
+            "chunks": chunks_data
+        }
     
     except Exception as e:
         return {"answer": f"Error processing your query: {str(e)}"}
