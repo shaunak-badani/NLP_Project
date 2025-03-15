@@ -1,62 +1,67 @@
-from datasets import load_dataset
-from transformers import GPT2ForSequenceClassification, GPT2Tokenizer, \
-        TrainingArguments, Trainer
-import torch
-import os
+from make_dataset import DatasetProcessor
+from torch.optim import AdamW
+from transformers import DataCollatorForLanguageModeling, GPT2Tokenizer, \
+         GPT2LMHeadModel, TrainingArguments, Trainer
 
-dataset = load_dataset("mteb/tweet_sentiment_extraction")
+class ModelTrainer:
+    
+   @staticmethod
+   def load_data_collator(tokenizer, mlm = False):
+      data_collator = DataCollatorForLanguageModeling(
+         tokenizer=tokenizer, 
+         mlm=mlm,
+      )
+      return data_collator
+   
+   @staticmethod
+   def get_parameters_to_train(model):
+      trainable_weight_names = set(['transformer.wte.weight'])
+      trainable_weights = [param for name, param in model.named_parameters() if name in trainable_weight_names]
+      return trainable_weights
+   
+   @staticmethod
+   def train(train_file_path,
+            model_name,
+            per_device_train_batch_size,
+          num_train_epochs):
+      tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+      train_dataset = DatasetProcessor.load_dataset(train_file_path, tokenizer)
+      data_collator = ModelTrainer.load_data_collator(tokenizer)
+            
+      model = GPT2LMHeadModel.from_pretrained(model_name)
 
-tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-tokenizer.pad_token = tokenizer.eos_token
+      training_args = TrainingArguments(
+         output_dir = "/tmp",
+         save_strategy = "no",
+         per_device_train_batch_size=per_device_train_batch_size,
+         num_train_epochs=num_train_epochs
+      )
 
-def tokenize_function(examples):
-   return tokenizer(examples["text"], padding="max_length", truncation=True)
+      optimizer = AdamW(
+         ModelTrainer.get_parameters_to_train(model), 
+         lr = 1e-5)
 
-tokenized_datasets = dataset.map(tokenize_function, batched=True)
-
-small_train_dataset = tokenized_datasets["train"].shuffle(seed=42).select(range(1000))
-small_eval_dataset = tokenized_datasets["test"].shuffle(seed=42).select(range(1000))
-
-
-model = GPT2ForSequenceClassification.from_pretrained("gpt2", num_labels=3)
-tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-
-# Set pad token
-tokenizer.pad_token = tokenizer.eos_token
-model.config.pad_token_id = model.config.eos_token_id
-
-weights_enabled = set(['transformer.wte.weight'])
-
-params_before = {}
-for name, param in model.named_parameters():
-    params_before[name] = param.clone()
-    param.requires_grad = name in weights_enabled
+      trainer = Trainer(
+               model=model,
+               args=training_args,
+               data_collator=data_collator,
+               train_dataset=train_dataset,
+               optimizers = (optimizer, None)
+      )
+         
+      trainer.train()
+   
 
 
-optimizer = torch.optim.AdamW(
-    [p for p in model.parameters() if p.requires_grad],
-    lr=5e-5
-)
+if __name__ == "__main__":
+   model_name = 'gpt2'
+   tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+   input_file_path = "./data/Articles.csv"
+   train_file_path = "./data/Articles.txt"
+   DatasetProcessor.process_data(input_file_path, train_file_path)
+   train_dataset = DatasetProcessor.load_dataset(train_file_path, tokenizer)
 
-training_args = TrainingArguments(
-   output_dir="test_trainer",
-   #evaluation_strategy="epoch",
-   per_device_train_batch_size=1,  # Reduce batch size here
-   per_device_eval_batch_size=1,    # Optionally, reduce for evaluation as well
-   gradient_accumulation_steps=4,
-   num_train_epochs = 1,
-)
+   per_device_train_batch_size = 8
+   num_train_epochs = 5.0
+   ModelTrainer.train(train_file_path, model_name, per_device_train_batch_size, num_train_epochs)
 
-trainer = Trainer(
-   model=model,
-   args=training_args,
-   train_dataset=small_train_dataset,
-   eval_dataset=small_eval_dataset,
-   optimizers=(optimizer, None)
-)
-
-trainer.train()
-
-model_dir = "models/"
-os.makedirs(model_dir, exist_ok = True)
-torch.save(model.state_dict(), "models/fine_tuned_model.pt")
