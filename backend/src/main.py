@@ -2,16 +2,19 @@ from fastapi import FastAPI, File, UploadFile, Form
 import io
 import PyPDF2
 from fastapi.middleware.cors import CORSMiddleware
-from chunking import chunk_by_sentence, chunk_by_paragraph, chunk_by_tokens
+from chunking import chunk_by_sentence, chunk_by_paragraph, chunk_by_page, chunk_by_tokens
 import os
 import json
 import sys
 import numpy as np
-import tempfile
 from embedding import EmbeddingGenerator
 from similarity_metrics import SimilarityCalculator
 from utils import format_context_for_llm, generate_llm_response
-from Naive import ChunkedTextSearcher
+from visualization import PCA_visualization, tSNE_visualization, UMAP_visualization
+import matplotlib.pyplot as plt
+import base64
+from io import BytesIO
+from fastapi.responses import JSONResponse
 
 app = FastAPI(root_path='/api')
 
@@ -43,8 +46,9 @@ current_document = {
     "similarity_metric": "",
 }
 
-# Global variable for the naive searcher
-naive_searcher = None
+query_embedding = []
+similarity_scores = [] 
+llm_response = ""
 
 @app.get("/")
 async def root():
@@ -55,6 +59,9 @@ async def upload_pdf(
     file: UploadFile = File(...),
     chunking_strategy: str = Form(...),
     token_size: int = Form(256),
+    sentence_size: int = Form(1),
+    paragraph_size: int = Form(1),
+    page_size: int = Form(1),
     embedding_model: str = Form(...),
     similarity_metric: str = Form(...),
 ):
@@ -79,16 +86,15 @@ async def upload_pdf(
         # Apply chunking strategy
         chunks = []
         if chunking_strategy == "sentence":
-            chunks = chunk_by_sentence(full_text)
+            chunks = chunk_by_sentence(full_text, size=sentence_size)
         elif chunking_strategy == "paragraph":
-            chunks = chunk_by_paragraph(full_text)
+            chunks = chunk_by_paragraph(full_text, size=paragraph_size)
+        elif chunking_strategy == "page":
+            chunks = chunk_by_page(full_text, pages, size=page_size)
         elif chunking_strategy == "tokens":
             chunks = chunk_by_tokens(full_text, token_size=token_size)
 
         embeddings = EmbeddingGenerator.get_embeddings(chunks, embedding_model)
-
-        print(len(chunks))
-        print(len(embeddings))
 
         # Store the document and chunks
         current_document["text"] = full_text
@@ -114,7 +120,13 @@ async def upload_pdf(
 
         with open("data/chunk_embeddings.json", "w") as f:
             # dump chunk as well as its embeddings
-            chunk_embeddings = [{"chunk": chunk, "embeddings": embedding} for chunk, embedding in zip(chunks, embeddings)]
+            chunk_embeddings = []
+            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+                chunk_embeddings.append({
+                    "chunk": chunk,
+                    "chunk_no": i+1,
+                    "embeddings": embedding
+                })
             json.dump(chunk_embeddings, f)
 
         
@@ -144,10 +156,13 @@ def query_traditional_model(query: str):
     return {"answer": answer}
 
 @app.get("/deep-learning")
-def query_deep_learning_model(query: str):
+def query_deep_learning_model(query: str, num_chunks: int = 5):
     """
     Query endpoint for the deep learning model
     """
+
+    global query_embedding, similarity_scores
+
     # Check if we have a document loaded
     if not current_document["chunks"]:
         return {"answer": "Please upload a document first."}
@@ -163,124 +178,70 @@ def query_deep_learning_model(query: str):
             current_document["similarity_metric"]
         )
         
-        # Get top 5 most relevant chunks
+        # Get top k most relevant chunks based on user input
         top_chunks = SimilarityCalculator.get_top_k_chunks(
             current_document["chunks"], 
             similarity_scores, 
-            k=5
+            k=num_chunks
         )
         
-        top_chunk_texts = [chunk for chunk, score in top_chunks]
+        top_chunk_texts = [chunk for _, (chunk, _) in top_chunks]
         context = format_context_for_llm(top_chunk_texts)
         llm_response = generate_llm_response(query, context)
         
         # Create a detailed answer with retrieved chunks and LLM response
         answer = llm_response
         
-        # answer += "--- Top Relevant Sections ---\n"
-        # for i, (chunk, score) in enumerate(top_chunks, 1):
-        #     # Truncate very long chunks for display
-        #     display_chunk = chunk[:150] + "..." if len(chunk) > 150 else chunk
-        #     answer += f"{i}. Relevance: {score:.4f}\n{display_chunk}\n\n"
+        # Return chunks and their scores along with the answer
+        chunks_data = [
+            {
+                "chunk_number": chunk_idx + 1,  # Add 1 since chunk_idx is 0-based
+                "text": chunk,
+                "relevance_score": float(score)  # Convert numpy float to Python float
+            }
+            for chunk_idx, (chunk, score) in top_chunks
+        ]
             
-        return {"answer": answer}
-    
-    except Exception as e:
-        return {"answer": f"Error processing your query: {str(e)}"}
-
-# New endpoints for the Naive approach - FIXED ROUTES
-
-@app.post("/upload-naive")
-async def upload_naive_document(
-    file: UploadFile = File(...),
-    chunking_strategy: str = Form(...),
-    token_size: int = Form(256),
-    overlap: int = Form(20),
-    similarity_metric: str = Form("cosine"),
-):
-    """
-    Upload a file and process it with the Naive approach
-    """
-    print(f"Received upload request: chunking_strategy={chunking_strategy}, token_size={token_size}")
-    try:
-        global naive_searcher
-        
-        # Create a new searcher with specified parameters
-        naive_searcher = ChunkedTextSearcher(
-            chunking_method=chunking_strategy,
-            chunk_size=token_size,
-            overlap=overlap
-        )
-        
-        # Save uploaded file to a temporary location
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as tmp:
-            tmp_path = tmp.name
-            tmp.write(await file.read())
-            print(f"Temp file created: {tmp_path}")
-        
-        # Add the file to the searcher
-        file_name = file.filename or "uploaded_document"
-        print(f"Processing file: {file_name}, type: {file.content_type}")
-        
-        if file_name.lower().endswith('.pdf'):
-            success = naive_searcher.add_pdf(file_name, tmp_path)
-        else:
-            # For non-PDF files, read as text
-            with open(tmp_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            success = naive_searcher.add_text(file_name, content)
-        
-        # Clean up the temp file
-        os.unlink(tmp_path)
-        
-        if not success:
-            return {"message": f"Failed to process {file_name}"}
-        
-        # Build the search index
-        naive_searcher.build_index()
-        
-        return {
-            "message": f"Document processed with {chunking_strategy} chunking strategy. Created {len(naive_searcher.chunks.get(file_name, []))} chunks."
-        }
-    
-    except Exception as e:
-        print(f"Error in upload_naive_document: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return {"message": f"Error: {str(e)}"}
-
-@app.get("/mean-naive")
-def query_naive_model(query: str, num_results: int = 3, similarity_metric: str = "cosine"):
-    """
-    Query endpoint for the naive model using TF-IDF
-    """
-    global naive_searcher
-    
-    if not naive_searcher:
-        return {"answer": "Please upload a document first."}
-    
-    try:
-        # Search using the naive searcher
-        results = naive_searcher.search(
-            query=query,
-            num_results=num_results,
-            similarity_metric=similarity_metric
-        )
-        
-        # Format the response
-        if not results:
-            answer = "No relevant results found for your query."
-        else:
-            # Generate a summary of the results
-            answer = f"Here are the top {len(results)} results for your query:\n\n"
-            
-            for i, result in enumerate(results, 1):
-                answer += f"{i}. {result['snippet']}\n\n"
-        
         return {
             "answer": answer,
-            "results": results  # Return the raw results for UI rendering
+            "chunks": chunks_data
         }
     
     except Exception as e:
         return {"answer": f"Error processing your query: {str(e)}"}
+    
+
+
+@app.get("/visualize-embeddings")
+async def visualize_embeddings(method: str = Query("pca"), k: int = Query(5)):
+    global similarity_scores
+
+    if not current_document["embeddings"]:
+        return {"error": "No document uploaded yet."}
+
+    if not query_embedding:
+        return {"error": "No query embedding available. Send a query first."}
+
+    if not similarity_scores:
+        return {"error": "No similarity scores available. Run a query first."}
+
+    try:
+        chunks_embs = np.array(current_document["embeddings"])
+        query_emb = np.array(query_embedding)
+        response_emb = EmbeddingGenerator.get_embeddings([llm_response], current_document["embedding_model"])[0]
+
+        top_chunk_indices = np.argsort(similarity_scores)[-k:] + 1  
+
+        if method.lower() == "pca":
+            img_base64 = PCA_visualization(chunks_embs, query_emb, response_emb, top_chunk_indices)
+        elif method.lower() == "tsne":
+            img_base64 = tSNE_visualization(chunks_embs, query_emb, response_emb, top_chunk_indices)
+        elif method.lower() == "umap":
+            img_base64 = UMAP_visualization(chunks_embs, query_emb, response_emb, top_chunk_indices)
+        else:
+            return {"error": "Invalid visualization method"}
+
+        return {"image": f"data:image/png;base64,{img_base64}"}
+
+    except Exception as e:
+        return {"error": f"Error generating visualization: {str(e)}"}
