@@ -6,6 +6,8 @@ import BackdropWithSpinner from "@/components/ui/backdropwithspinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface Chunk {
     chunk_number: number;
@@ -251,6 +253,7 @@ const DeepLearning = () => {
                                 <SelectItem value="roberta">RoBERTa (roberta-base)</SelectItem>
                                 <SelectItem value="distilbert">DistilBERT (distilbert-base-uncased)</SelectItem>
                                 <SelectItem value="gpt2">GPT-2 (gpt2)</SelectItem>
+                                <SelectItem value="fine-tuned-financial">Fine-tuned Financial (bge-base)</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -314,7 +317,11 @@ const DeepLearning = () => {
                 <div className="space-y-6">
                     <div className="p-6 border rounded-lg bg-gray-50">
                         <h3 className="text-lg font-medium mb-2">Response</h3>
-                        <p>{response.answer}</p>
+                        <div className="prose prose-sm md:prose-base lg:prose-lg dark:prose-invert prose-pre:bg-gray-800 prose-pre:text-gray-100 max-w-none">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {response.answer}
+                            </ReactMarkdown>
+                        </div>
                     </div>
 
                     {response.chunks && response.chunks.length > 0 && (
@@ -332,7 +339,11 @@ const DeepLearning = () => {
                                             </div>
                                         </AccordionTrigger>
                                         <AccordionContent>
-                                            <p className="whitespace-pre-wrap">{chunk.text}</p>
+                                            <div className="prose prose-sm md:prose-base dark:prose-invert prose-pre:bg-gray-800 prose-pre:text-gray-100 max-w-none">
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                    {chunk.text}
+                                                </ReactMarkdown>
+                                            </div>
                                         </AccordionContent>
                                     </AccordionItem>
                                 ))}

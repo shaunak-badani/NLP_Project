@@ -12,6 +12,7 @@ class EmbeddingGenerator:
     distilbert_model = DistilBertModel.from_pretrained("distilbert-base-uncased")
     gpt2_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     gpt2_model = GPT2Model.from_pretrained("gpt2")
+    fine_tuned_model = SentenceTransformer("philschmid/bge-base-financial-matryoshka")
 
     @staticmethod
     def get_embeddings(texts: List[str], model_name: str) -> List[List[float]]:
@@ -34,6 +35,8 @@ class EmbeddingGenerator:
             inputs = EmbeddingGenerator.gpt2_tokenizer(texts, padding=True, truncation=True, return_tensors="pt")
             outputs = EmbeddingGenerator.gpt2_model(**inputs)
             embeddings = outputs.last_hidden_state[:, -1, :].detach().numpy().tolist()
+        elif model_name == "fine-tuned-financial":
+            embeddings = EmbeddingGenerator.fine_tuned_model.encode(texts).tolist()
         else:
             raise ValueError(f"Unknown embedding model: {model_name}")
         return embeddings
