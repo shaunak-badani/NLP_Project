@@ -2,24 +2,27 @@ from fastapi import FastAPI, File, UploadFile, Form, Query
 import io
 import PyPDF2
 from fastapi.middleware.cors import CORSMiddleware
-from src.chunking import chunk_by_sentence, chunk_by_paragraph, chunk_by_page, chunk_by_tokens
+from .chunking import chunk_by_sentence, chunk_by_paragraph, chunk_by_page, chunk_by_tokens
 import os
 import json
 import sys
 import numpy as np
 import tempfile
-from src.embedding import EmbeddingGenerator
-from src.similarity_metrics import SimilarityCalculator
-from src.utils import format_context_for_llm, generate_llm_response
-from src.visualization import PCA_visualization, tSNE_visualization, UMAP_visualization
-from src.Naive import ChunkedTextSearcher
+from embedding import EmbeddingGenerator
+from similarity_metrics import SimilarityCalculator
+from utils import format_context_for_llm, generate_llm_response
+from visualization import PCA_visualization, tSNE_visualization, UMAP_visualization
+from Naive import ChunkedTextSearcher
 import matplotlib.pyplot as plt
 import base64
 from io import BytesIO
 from fastapi.responses import JSONResponse
-from src.mean_search import MeanSearcher
+from mean_search import MeanSearcher
 
 app = FastAPI(root_path='/api')
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(current_dir)
 
 origins = [
     "http://localhost:5173",
