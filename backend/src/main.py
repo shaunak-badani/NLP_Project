@@ -2,7 +2,7 @@ from fastapi import FastAPI, File, UploadFile, Form, Query
 import io
 import PyPDF2
 from fastapi.middleware.cors import CORSMiddleware
-from .chunking import chunk_by_sentence, chunk_by_paragraph, chunk_by_page, chunk_by_tokens
+from chunking import chunk_by_sentence, chunk_by_paragraph, chunk_by_page, chunk_by_tokens
 import os
 import json
 import sys
