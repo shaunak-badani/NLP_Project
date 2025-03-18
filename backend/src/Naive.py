@@ -15,7 +15,6 @@ sys.path.append("./src")
 from chunking import chunk_by_tokens, chunk_by_sentence, chunk_by_paragraph, chunk_by_page
 from similarity_metrics import SimilarityCalculator
 
-# NLTK data is downloaded
 try:
     nltk.data.find('tokenizers/punkt')
     nltk.data.find('corpora/stopwords')
@@ -26,19 +25,15 @@ except LookupError:
 
 def clean_text(text, use_stemming=True):
     """Make text searchable by cleaning it up"""
-    # Lowercase everything
     text = text.lower()
     
-    # Remove punctuation and numbers
     text = re.sub(r'[^\w\s]', ' ', text)
     text = re.sub(r'\d+', ' ', text)
     
-    # Remove common words like "the", "and", etc.
     words = word_tokenize(text)
     stop_list = set(stopwords.words('english'))
     words = [word for word in words if word not in stop_list]
     
-    # Simplify words to their root form if needed
     if use_stemming:
         from nltk.stem import PorterStemmer
         stemmer = PorterStemmer()
@@ -51,14 +46,12 @@ def find_relevant_bit(text, query, max_len=200):
     paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
     search_words = set(query.lower().split())
     
-    # Look for a paragraph containing any search words
     for para in paragraphs:
         if any(word in para.lower() for word in search_words):
             if len(para) <= max_len:
                 return para
             return para[:max_len] + "..."
     
-    # If nothing matches, return the beginning
     return text[:max_len] + "..." if text else ""
 
 def extract_text_from_pdf(pdf_path):
@@ -93,11 +86,11 @@ class ChunkedTextSearcher:
         """
         self.vectorizer = TfidfVectorizer()
         self.chunk_vectors = None
-        self.doc_names = []        # Document names
-        self.docs = {}             # Full document text
-        self.pages = {}            # Page-separated text
-        self.chunks = {}           # Document chunks
-        self.chunk_info = []       # List of (doc_name, chunk_index) tuples
+        self.doc_names = []        
+        self.docs = {}             
+        self.pages = {}            
+        self.chunks = {}           
+        self.chunk_info = []       
         self.chunking_method = chunking_method
         self.chunk_size = chunk_size
         self.chunk_overlap = overlap
@@ -105,18 +98,15 @@ class ChunkedTextSearcher:
     def add_pdf(self, name, pdf_path):
         """Add a PDF document and split it into chunks"""
         try:
-            # Extract text from the PDF
             text, page_texts = extract_text_from_pdf(pdf_path)
             
             if not text:
                 print(f"Error: Could not extract text from {pdf_path}")
                 return False
                 
-            # Save the full document and pages
             self.docs[name] = text
             self.pages[name] = page_texts
             
-            # Add to our list if it's new
             if name not in self.doc_names:
                 self.doc_names.append(name)
             
@@ -138,7 +128,6 @@ class ChunkedTextSearcher:
             # Update chunk info list
             self._update_chunk_info()
             
-            # We'll need to rebuild our search index
             self.chunk_vectors = None
             
             print(f"Added PDF '{name}' with {len(doc_chunks)} chunks using {self.chunking_method} chunking.")
@@ -150,13 +139,10 @@ class ChunkedTextSearcher:
     def add_text(self, name, content):
         """Add text content and split into chunks"""
         try:
-            # Save the full document
             self.docs[name] = content
             
-            # For page chunking, we'll treat the entire text as one page
             self.pages[name] = [content]
             
-            # Add to our list if it's new
             if name not in self.doc_names:
                 self.doc_names.append(name)
             
@@ -168,17 +154,15 @@ class ChunkedTextSearcher:
             elif self.chunking_method == "paragraph":
                 doc_chunks = chunk_by_paragraph(content)
             elif self.chunking_method == "page":
-                doc_chunks = [content]  # Treat as one page
+                doc_chunks = [content]  
             else:
                 print(f"Unknown chunking method: {self.chunking_method}, using tokens")
                 doc_chunks = chunk_by_tokens(content, token_size=self.chunk_size, overlap=self.chunk_overlap)
                 
             self.chunks[name] = doc_chunks
             
-            # Update chunk info list
             self._update_chunk_info()
             
-            # We'll need to rebuild our search index
             self.chunk_vectors = None
             
             print(f"Added text '{name}' with {len(doc_chunks)} chunks using {self.chunking_method} chunking.")
@@ -202,13 +186,11 @@ class ChunkedTextSearcher:
             
         print(f"Building search index for {len(self.chunk_info)} chunks...")
             
-        # Clean up all chunks
         processed_chunks = []
         for doc_name, chunk_idx in self.chunk_info:
             chunk_text = self.chunks[doc_name][chunk_idx]
             processed_chunks.append(clean_text(chunk_text))
             
-        # Create vectors for searching
         self.chunk_vectors = self.vectorizer.fit_transform(processed_chunks)
         print("Search index built.")
     
@@ -224,7 +206,6 @@ class ChunkedTextSearcher:
         Returns:
             List of result dictionaries with document, chunk, and score information
         """
-        # Make sure our index is ready
         if self.chunk_vectors is None:
             self.build_index()
             
@@ -232,13 +213,10 @@ class ChunkedTextSearcher:
             print("No documents indexed.")
             return []
             
-        # Clean up the query the same way
         clean_query = clean_text(query)
         
-        # Turn it into a vector
         query_vector = self.vectorizer.transform([clean_query])
         
-        # Get the matrix form for the similarity calculator
         query_vector_array = query_vector.toarray()[0]
         chunk_vectors_array = self.chunk_vectors.toarray()
         
@@ -248,7 +226,6 @@ class ChunkedTextSearcher:
             chunk_vectors_array, 
             similarity_metric)
         
-        # Get the best matches
         results = []
         best_idx = np.argsort(similarities)[-num_results:][::-1]
         
@@ -256,7 +233,6 @@ class ChunkedTextSearcher:
             doc_name, chunk_idx = self.chunk_info[idx]
             chunk_text = self.chunks[doc_name][chunk_idx]
             
-            # Calculate chunk position in document (approximate)
             total_chunks = len(self.chunks[doc_name])
             position = (chunk_idx + 1) / total_chunks
             
@@ -301,14 +277,12 @@ def main():
     
     args = parser.parse_args()
     
-    # Create the chunked searcher
     searcher = ChunkedTextSearcher(
         chunking_method=args.chunking,
         chunk_size=args.chunk_size,
         overlap=args.overlap
     )
     
-    # Add document(s)
     if args.pdf:
         if os.path.exists(args.pdf):
             doc_name = os.path.basename(args.pdf)
@@ -340,7 +314,6 @@ def main():
     # Build the index
     searcher.build_index()
     
-    # Perform search if query provided
     if args.query:
         print(f"\nSearching for: '{args.query}'")
         results = searcher.search(args.query, num_results=args.results, similarity_metric=args.similarity)
@@ -355,7 +328,6 @@ def main():
     else:
         print("\nNo search query provided. Use --query to search.")
         
-        # Summary of the documents
         print("\nDocument summary:")
         for doc in searcher.doc_names:
             print(f"- {doc}: {len(searcher.chunks[doc])} chunks")

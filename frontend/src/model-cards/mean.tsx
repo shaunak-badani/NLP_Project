@@ -11,23 +11,24 @@ const Mean = () => {
     const [query, setQuery] = useState("");
     const [response, setResponse] = useState("");
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [chunkingStrategy, setChunkingStrategy] = useState("tokens");
-    const [similarityMetric, setSimilarityMetric] = useState("cosine");
+    const [chunkingMethod, setChunkingMethod] = useState("paragraph");
+    const [similarityMethod, setSimilarityMethod] = useState("cosine");
     const [uploadStatus, setUploadStatus] = useState("");
-    const [tokenSize, setTokenSize] = useState(256);
-    const [overlap, setOverlap] = useState(20);
+    const [chunkSize, setChunkSize] = useState(200);
+    const [overlap, setOverlap] = useState(50);
+    const [sentencesPerChunk, setSentencesPerChunk] = useState(3);
     const [numResults, setNumResults] = useState(3);
     const [results, setResults] = useState<any[]>([]);
-    const [serverUrl, setServerUrl] = useState("http://localhost:8080");
+    const [serverUrl, setServerUrl] = useState("http://localhost:8000");
 
-    const handlePromptInput = async(query: string) => {
+    const handleQuery = async(query: string) => {
         setLoading(true);
         try {
-            const response = await axios.get(`${serverUrl}/mean-naive`, {
+            const response = await axios.get(`${serverUrl}/search-mean`, {
                 params: {
                     query: query,
                     num_results: numResults,
-                    similarity_metric: similarityMetric
+                    similarity_method: similarityMethod
                 }
             });
             
@@ -64,13 +65,13 @@ const Mean = () => {
         setLoading(true);
         const formData = new FormData();
         formData.append("file", selectedFile);
-        formData.append("chunking_strategy", chunkingStrategy);
-        formData.append("token_size", tokenSize.toString());
+        formData.append("chunking_method", chunkingMethod);
+        formData.append("chunk_size", chunkSize.toString());
         formData.append("overlap", overlap.toString());
-        formData.append("similarity_metric", similarityMetric);
+        formData.append("sentences_per_chunk", sentencesPerChunk.toString());
 
         try {
-            const response = await axios.post(`${serverUrl}/upload-naive`, formData, {
+            const response = await axios.post(`${serverUrl}/upload-mean`, formData, {
                 headers: {
                     "Content-Type": "multipart/form-data",
                 }
@@ -79,7 +80,7 @@ const Mean = () => {
             if (response.data && response.data.message) {
                 setUploadStatus(`Success! ${response.data.message}`);
             } else {
-                setUploadStatus(`Success! Document processed with ${chunkingStrategy} chunking strategy.`);
+                setUploadStatus(`Success! Document processed.`);
             }
         } catch (error) {
             console.error("Upload error:", error);
@@ -91,28 +92,17 @@ const Mean = () => {
     return (
         <>
             <div className="mb-8 p-6 border rounded-lg">
-                <h3 className="text-lg font-medium mb-4">Document Upload for Naive Approach</h3>
+                <h3 className="text-lg font-medium mb-4">Document Upload</h3>
                 <p className="mb-4">
-                    This model uses TF-IDF vectorization with scikit-learn and basic text preprocessing 
-                    for document retrieval. It's effective for keyword-based searches in smaller documents.
+                 NLP approach using simple bag-of-words 
+                    representation with word counting.
                 </p>
                 
                 <div className="space-y-4">
                     <div>
-                        <Label htmlFor="server-url" className="block mb-2">Server URL</Label>
-                        <input
-                            id="server-url"
-                            type="text"
-                            value={serverUrl}
-                            onChange={(e) => setServerUrl(e.target.value)}
-                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        />
-                    </div>
-                    
-                    <div>
-                        <Label htmlFor="pdf-upload" className="block mb-2">Upload PDF Document</Label>
+                        <Label htmlFor="file-upload" className="block mb-2">Upload PDF Document</Label>
                         <input 
-                            id="pdf-upload"
+                            id="file-upload"
                             type="file" 
                             accept=".pdf,.txt" 
                             onChange={handleFileChange}
@@ -121,44 +111,43 @@ const Mean = () => {
                     </div>
                     
                     <div>
-                        <Label htmlFor="chunking-strategy" className="block mb-2">Chunking Strategy</Label>
+                        <Label htmlFor="chunking-method" className="block mb-2">Chunking Strategy</Label>
                         <Select 
-                            value={chunkingStrategy} 
-                            onValueChange={setChunkingStrategy}
+                            value={chunkingMethod} 
+                            onValueChange={setChunkingMethod}
                         >
                             <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Select chunking strategy" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="tokens">By Tokens</SelectItem>
-                                <SelectItem value="sentence">By Sentence</SelectItem>
                                 <SelectItem value="paragraph">By Paragraph</SelectItem>
-                                <SelectItem value="page">By Page</SelectItem>
+                                <SelectItem value="sentence">By Sentence</SelectItem>
+                                <SelectItem value="fixed_size">By Fixed Size</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
                     
-                    {chunkingStrategy === "tokens" && (
+                    {chunkingMethod === "fixed_size" && (
                         <>
                             <div>
-                                <Label htmlFor="token-size" className="block mb-2">Token Size</Label>
+                                <Label htmlFor="chunk-size" className="block mb-2">Chunk Size (words)</Label>
                                 <input
-                                    id="token-size"
+                                    id="chunk-size"
                                     type="number"
                                     min="50"
                                     max="1000"
-                                    value={tokenSize}
-                                    onChange={(e) => setTokenSize(Number(e.target.value))}
+                                    value={chunkSize}
+                                    onChange={(e) => setChunkSize(Number(e.target.value))}
                                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                                 />
                             </div>
                             <div>
-                                <Label htmlFor="overlap" className="block mb-2">Overlap</Label>
+                                <Label htmlFor="overlap" className="block mb-2">Overlap (words)</Label>
                                 <input
                                     id="overlap"
                                     type="number"
                                     min="0"
-                                    max="100"
+                                    max="200"
                                     value={overlap}
                                     onChange={(e) => setOverlap(Number(e.target.value))}
                                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -167,11 +156,26 @@ const Mean = () => {
                         </>
                     )}
 
+                    {chunkingMethod === "sentence" && (
+                        <div>
+                            <Label htmlFor="sentences-per-chunk" className="block mb-2">Number of Sentences per Chunk</Label>
+                            <input
+                                id="sentences-per-chunk"
+                                type="number"
+                                min="1"
+                                max="10"
+                                value={sentencesPerChunk}
+                                onChange={(e) => setSentencesPerChunk(Number(e.target.value))}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            />
+                        </div>
+                    )}
+
                     <div>
-                        <Label htmlFor="similarity-metric" className="block mb-2">Similarity Metric</Label>
+                        <Label htmlFor="similarity-method" className="block mb-2">Similarity Metric</Label>
                         <Select 
-                            value={similarityMetric} 
-                            onValueChange={setSimilarityMetric}
+                            value={similarityMethod} 
+                            onValueChange={setSimilarityMethod}
                         >
                             <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Select similarity metric" />
@@ -185,7 +189,7 @@ const Mean = () => {
                     </div>
 
                     <div>
-                        <Label htmlFor="num-results" className="block mb-2">Number of Results</Label>
+                        <Label htmlFor="num-results" className="block mb-2">Number of Chunks to Retrieve</Label>
                         <input
                             id="num-results"
                             type="number"
@@ -214,11 +218,11 @@ const Mean = () => {
                 <Textarea
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Enter your query here!"
+                    placeholder="Enter your query here..."
                     className="mb-4"
                 />
-                <Button onClick={() => handlePromptInput(query)}>
-                    Send Query
+                <Button onClick={() => handleQuery(query)}>
+                    Search
                 </Button>
             </div>
             
@@ -239,7 +243,7 @@ const Mean = () => {
                                                 Score: {(result.score * 100).toFixed(1)}%
                                             </span>
                                         </div>
-                                        <p className="text-sm">{result.snippet}</p>
+                                        <p className="text-sm whitespace-pre-line">{result.snippet}</p>
                                     </div>
                                 ))}
                             </div>

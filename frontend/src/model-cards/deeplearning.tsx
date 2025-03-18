@@ -147,7 +147,9 @@ const DeepLearning = () => {
         <>
             <div className="mb-8 p-6 border rounded-lg">
                 <h3 className="text-lg font-medium mb-4">Document Upload</h3>
-                
+                <p className="mb-4">
+                     NLP approach using deep learning, using LLM's
+                </p>
                 <div className="space-y-4">
                     <div>
                         <Label htmlFor="pdf-upload" className="block mb-2">Upload PDF Document</Label>
