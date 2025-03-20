@@ -11,6 +11,7 @@ class EmbeddingGenerator:
     distilbert_tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
     distilbert_model = DistilBertModel.from_pretrained("distilbert-base-uncased")
     gpt2_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    gpt2_tokenizer.pad_token = gpt2_tokenizer.eos_token 
     gpt2_model = GPT2Model.from_pretrained("gpt2")
     fine_tuned_model = SentenceTransformer("philschmid/bge-base-financial-matryoshka")
 
