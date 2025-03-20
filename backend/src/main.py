@@ -208,7 +208,7 @@ async def search_mean(
         
         if results:
             top_result = results[0]
-            answer = f"Found {len(results)} relevant chunks. Most relevant (score: {top_result['score']:.2f}) is from document '{top_result['document']}'."
+            answer = f"Found {len(results)} relevant chunks."
         else:
             answer = "No relevant results found for your query."
         
@@ -340,7 +340,7 @@ def query_deep_learning_model(query: str, num_chunks: int = 5):
             k=num_chunks
         )
         
-        top_chunk_texts = [chunk for _, (chunk, _) in top_chunks]
+        top_chunk_texts = [(chunk, chunk_number) for chunk_number, (chunk, _) in top_chunks]
         context = format_context_for_llm(top_chunk_texts)
         llm_response = generate_llm_response(query, context)
         
@@ -381,7 +381,7 @@ async def visualize_embeddings(method: str = Query("pca"), k: int = Query(5)):
         query_emb = np.array(query_embedding)
         response_emb = EmbeddingGenerator.get_embeddings([llm_response], current_document["embedding_model"])[0]
 
-        top_chunk_indices = np.argsort(similarity_scores)[-k:] + 1  
+        top_chunk_indices = np.argsort(similarity_scores)[-k:]
 
         if method.lower() == "pca":
             img_base64 = PCA_visualization(chunks_embs, query_emb, response_emb, top_chunk_indices)
