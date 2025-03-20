@@ -12,7 +12,7 @@ from embedding import EmbeddingGenerator
 from similarity_metrics import SimilarityCalculator
 from utils import format_context_for_llm, generate_llm_response
 from visualization import PCA_visualization, tSNE_visualization, UMAP_visualization
-from Naive import ChunkedTextSearcher
+from naive import ChunkedTextSearcher
 from mean_search import MeanSearcher
 
 app = FastAPI(root_path='/api')
