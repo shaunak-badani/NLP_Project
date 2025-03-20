@@ -35,7 +35,6 @@ const DeepLearning = () => {
     const [sentenceSize, setSentenceSize] = useState(1);
     const [paragraphSize, setParagraphSize] = useState(1);
     const [pageSize, setPageSize] = useState(1);
-    const [dimReduction, setdimReduction] = useState("pca");
     const [visualizationImagePCA, setVisualizationImagePCA] = useState<string | null>(null);
     const [visualizationImageTSNE, setVisualizationImageTSNE] = useState<string | null>(null);
     const [visualizationImageUMAP, setVisualizationImageUMAP] = useState<string | null>(null);

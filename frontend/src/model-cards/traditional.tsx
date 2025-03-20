@@ -20,7 +20,7 @@ const Traditional = () => {
     const [sentencesPerChunk, setSentencesPerChunk] = useState(3);
     const [numResults, setNumResults] = useState(3);
     const [results, setResults] = useState<any[]>([]);
-    const [serverUrl, setServerUrl] = useState("http://localhost:8000");
+    const [serverUrl, _] = useState("http://localhost:8000");
 
     const handleQuery = async(query: string) => {
         setLoading(true);
