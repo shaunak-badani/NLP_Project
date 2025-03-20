@@ -5,22 +5,30 @@ from fastapi.middleware.cors import CORSMiddleware
 from chunking import chunk_by_sentence, chunk_by_paragraph, chunk_by_page, chunk_by_tokens
 import os
 import json
+import sys
 import numpy as np
+import tempfile
 from embedding import EmbeddingGenerator
 from similarity_metrics import SimilarityCalculator
 from utils import format_context_for_llm, generate_llm_response
 from visualization import PCA_visualization, tSNE_visualization, UMAP_visualization
+from Naive import ChunkedTextSearcher
 import matplotlib.pyplot as plt
 import base64
 from io import BytesIO
 from fastapi.responses import JSONResponse
+from mean_search import MeanSearcher
 
 app = FastAPI(root_path='/api')
 
-# list of allowed origins
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(current_dir)
+
 origins = [
     "http://localhost:5173",
-    "http://vcm-45508.vm.duke.edu"
+    "http://vcm-45508.vm.duke.edu",
+    "http://localhost:5174",
+    "http://localhost:8080"
 ]
 
 app.add_middleware(
@@ -33,7 +41,6 @@ app.add_middleware(
 
 os.makedirs("data", exist_ok=True)
 
-# Global variable to store the current document and its chunks. For visualization, will be easy to retrieve chunks and embeddings.
 current_document = {
     "text": "",
     "pages": [],
@@ -44,6 +51,8 @@ current_document = {
     "similarity_metric": "",
 }
 
+mean_searcher = MeanSearcher()
+naive_searcher = ChunkedTextSearcher(chunking_method="tokens", chunk_size=256, overlap=20)
 query_embedding = []
 similarity_scores = [] 
 llm_response = ""
@@ -67,11 +76,9 @@ async def upload_pdf(
     Upload a PDF file and chunk it according to the specified strategy
     """
     try:
-        # Read the PDF file
         pdf_content = await file.read()
         pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
         
-        # Extract text from all pages
         full_text = ""
         pages = []
         
@@ -81,7 +88,6 @@ async def upload_pdf(
             pages.append(page_text)
             full_text += page_text + "\n\n"
         
-        # Apply chunking strategy
         chunks = []
         if chunking_strategy == "sentence":
             chunks = chunk_by_sentence(full_text, size=sentence_size)
@@ -94,7 +100,6 @@ async def upload_pdf(
 
         embeddings = EmbeddingGenerator.get_embeddings(chunks, embedding_model)
 
-        # Store the document and chunks
         current_document["text"] = full_text
         current_document["pages"] = pages
         current_document["chunks"] = chunks
@@ -115,9 +120,7 @@ async def upload_pdf(
             }
             json.dump(doc_data, f)
 
-
         with open("data/chunk_embeddings.json", "w") as f:
-            # dump chunk as well as its embeddings
             chunk_embeddings = []
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
                 chunk_embeddings.append({
@@ -136,6 +139,50 @@ async def upload_pdf(
     except Exception as e:
         return {"message": str(e)}
 
+@app.post("/upload-mean")
+async def upload_mean(
+    file: UploadFile = File(...),
+    chunking_method: str = Form("paragraph"),
+    chunk_size: int = Form(200),
+    overlap: int = Form(50),
+    sentences_per_chunk: int = Form(3)
+):
+    """
+    Upload a document for the mean (lexical) search approach
+    """
+    global mean_searcher
+    
+    try:
+        content = await file.read()
+        
+        if file.filename.lower().endswith('.pdf'):
+            # Save PDF to a temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+                temp_file.write(content)
+                temp_path = temp_file.name
+            
+            num_chunks = mean_searcher.add_pdf(
+                file.filename, temp_path, 
+                chunking_method, chunk_size, overlap, sentences_per_chunk
+            )
+            
+            os.unlink(temp_path)
+        else:
+            text_content = content.decode('utf-8')
+            num_chunks = mean_searcher.add_document(
+                file.filename, text_content,
+                chunking_method, chunk_size, overlap, sentences_per_chunk
+            )
+        
+        mean_searcher.build_index()
+        
+        return {
+            "message": f"Document processed with {chunking_method} chunking. Created {num_chunks} chunks."
+        }
+    
+    except Exception as e:
+        return {"message": f"Error: {str(e)}"}
+
 @app.get("/mean")
 def query_mean_model(query: str):
     """
@@ -145,6 +192,37 @@ def query_mean_model(query: str):
     answer = f"Response to the mean query : {query}"
     return {"answer": answer}
 
+@app.get("/search-mean")
+async def search_mean(
+    query: str,
+    num_results: int = 3,
+    similarity_method: str = "overlap"
+):
+    """
+    Search using the mean (first-generation bag-of-words) approach
+    """
+    global mean_searcher
+    
+    try:
+        results = mean_searcher.search(query, num_results, similarity_method)
+        
+        if results:
+            top_result = results[0]
+            answer = f"Found {len(results)} relevant chunks. Most relevant (score: {top_result['score']:.2f}) is from document '{top_result['document']}'."
+        else:
+            answer = "No relevant results found for your query."
+        
+        return {
+            "answer": answer,
+            "results": results
+        }
+    
+    except Exception as e:
+        return {
+            "answer": f"Error: {str(e)}",
+            "results": []
+        }
+
 @app.get("/traditional")
 def query_traditional_model(query: str):
     """
@@ -152,6 +230,87 @@ def query_traditional_model(query: str):
     """
     answer = f"Response to the traditional query : {query}"
     return {"answer": answer}
+
+@app.post("/upload-naive")
+async def upload_naive(
+    file: UploadFile = File(...),
+    chunking_method: str = Form("tokens"),
+    chunk_size: int = Form(256),
+    overlap: int = Form(20),
+    similarity_metric: str = Form("cosine"),
+):
+    """
+    Upload a document for the naive chunked text search approach
+    """
+    global naive_searcher
+    
+    try:
+        naive_searcher.chunking_method = chunking_method
+        naive_searcher.chunk_size = chunk_size
+        naive_searcher.chunk_overlap = overlap
+        
+        # Read the file
+        content = await file.read()
+        
+        if file.filename.lower().endswith('.pdf'):
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
+                temp_file.write(content)
+                temp_path = temp_file.name
+            
+            success = naive_searcher.add_pdf(file.filename, temp_path)
+            
+            os.unlink(temp_path)
+            
+            if not success:
+                return {"message": f"Error processing PDF: {file.filename}"}
+        else:
+            text_content = content.decode('utf-8')
+            success = naive_searcher.add_text(file.filename, text_content)
+            
+            if not success:
+                return {"message": f"Error processing text file: {file.filename}"}
+        
+        naive_searcher.build_index()
+        
+        chunk_count = sum(len(chunks) for chunks in naive_searcher.chunks.values())
+        return {
+            "message": f"Document processed with {chunking_method} chunking. Created {chunk_count} chunks."
+        }
+    
+    except Exception as e:
+        return {"message": f"Error: {str(e)}"}
+
+@app.get("/search-naive")
+async def search_naive(
+    query: str,
+    num_results: int = 3,
+    similarity_metric: str = "cosine"
+):
+    """
+    Search using the naive chunked text search approach
+    """
+    global naive_searcher
+    
+    try:
+        # Perform the search
+        results = naive_searcher.search(query, num_results=num_results, similarity_metric=similarity_metric)
+        
+        if results:
+            top_result = results[0]
+            answer = f"Found {len(results)} relevant chunks. Most relevant (score: {top_result['score']:.2f}) is from document '{top_result['document']}'."
+        else:
+            answer = "No relevant results found for your query."
+        
+        return {
+            "answer": answer,
+            "results": results
+        }
+    
+    except Exception as e:
+        return {
+            "answer": f"Error: {str(e)}",
+            "results": []
+        }
 
 @app.get("/deep-learning")
 def query_deep_learning_model(query: str, num_chunks: int = 5):
@@ -161,7 +320,6 @@ def query_deep_learning_model(query: str, num_chunks: int = 5):
 
     global query_embedding, similarity_scores
 
-    # Check if we have a document loaded
     if not current_document["chunks"]:
         return {"answer": "Please upload a document first."}
     
@@ -169,7 +327,6 @@ def query_deep_learning_model(query: str, num_chunks: int = 5):
         # Get embeddings for the query using the same model as the chunks
         query_embedding = EmbeddingGenerator.get_embeddings([query], current_document["embedding_model"])[0]
         
-        # Calculate similarity scores based on selected metric
         similarity_scores = SimilarityCalculator.get_similarity_scores(
             query_embedding, 
             current_document["embeddings"], 
@@ -187,15 +344,13 @@ def query_deep_learning_model(query: str, num_chunks: int = 5):
         context = format_context_for_llm(top_chunk_texts)
         llm_response = generate_llm_response(query, context)
         
-        # Create a detailed answer with retrieved chunks and LLM response
         answer = llm_response
         
-        # Return chunks and their scores along with the answer
         chunks_data = [
             {
-                "chunk_number": chunk_idx + 1,  # Add 1 since chunk_idx is 0-based
+                "chunk_number": chunk_idx + 1, 
                 "text": chunk,
-                "relevance_score": float(score)  # Convert numpy float to Python float
+                "relevance_score": float(score)  
             }
             for chunk_idx, (chunk, score) in top_chunks
         ]
@@ -207,8 +362,6 @@ def query_deep_learning_model(query: str, num_chunks: int = 5):
     
     except Exception as e:
         return {"answer": f"Error processing your query: {str(e)}"}
-    
-
 
 @app.get("/visualize-embeddings")
 async def visualize_embeddings(method: str = Query("pca"), k: int = Query(5)):
