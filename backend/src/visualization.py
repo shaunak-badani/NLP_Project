@@ -19,9 +19,9 @@ def plot_embeddings_multi(embeddings_2d, top_chunk_indices, title, x_axis_label,
     top_points = embeddings_2d[top_chunk_indices]
     plt.scatter(top_points[:, 0], top_points[:, 1], color='green', alpha=0.7, label="Top Relevant Chunks")
     
-    # Label each top chunk point
+    # Label each top chunk point with 1-indexed numbers to match frontend display
     for i, idx in enumerate(top_chunk_indices):
-        plt.text(top_points[i, 0], top_points[i, 1], f"Chunk {idx}", color='black', fontsize=9, ha='left', va='center')
+        plt.text(top_points[i, 0], top_points[i, 1], f"Chunk {idx + 1}", color='black', fontsize=9, ha='left', va='center')
 
     # Plot other chunk embeddings in blue
     all_indices = set(range(0, len(embeddings_2d)-2))
@@ -51,11 +51,13 @@ def PCA_visualization(chunks_embs, query_emb, response_emb, top_indices):
     return plot_embeddings_multi(embeddings_2d, top_indices, "PCA Projection", "PCA Component 1", "PCA Component 2")
 
 def tSNE_visualization(chunks_embs, query_emb, response_emb, top_indices):
-    tsne = TSNE(n_components=2, perplexity=min(30, max(1, len(chunks_embs) // 3)), random_state=42)
+    perplexity = min(30, max(5, len(chunks_embs) // 4))
+    tsne = TSNE(n_components=2, perplexity=perplexity, random_state=42, n_iter=1000)
     embeddings_2d = tsne.fit_transform(np.vstack([chunks_embs, query_emb, response_emb]))
     return plot_embeddings_multi(embeddings_2d, top_indices, "t-SNE Projection", "t-SNE Component 1", "t-SNE Component 2")
 
 def UMAP_visualization(chunks_embs, query_emb, response_emb, top_indices):
-    reducer = umap.UMAP(n_components=2, n_neighbors=min(15, len(chunks_embs) - 1), min_dist=0.1, metric='euclidean', random_state=42)
+    n_neighbors = min(15, max(5, len(chunks_embs) // 4))
+    reducer = umap.UMAP(n_components=2, n_neighbors=n_neighbors, min_dist=0.1, metric='cosine', random_state=42)
     embeddings_2d = reducer.fit_transform(np.vstack([chunks_embs, query_emb, response_emb]))
     return plot_embeddings_multi(embeddings_2d, top_indices, "UMAP Projection", "UMAP Component 1", "UMAP Component 2")

@@ -12,11 +12,7 @@ from embedding import EmbeddingGenerator
 from similarity_metrics import SimilarityCalculator
 from utils import format_context_for_llm, generate_llm_response
 from visualization import PCA_visualization, tSNE_visualization, UMAP_visualization
-from Naive import ChunkedTextSearcher
-import matplotlib.pyplot as plt
-import base64
-from io import BytesIO
-from fastapi.responses import JSONResponse
+from naive import ChunkedTextSearcher
 from mean_search import MeanSearcher
 
 app = FastAPI(root_path='/api')
@@ -49,6 +45,7 @@ current_document = {
     "embedding_model": "",
     "embeddings": [],
     "similarity_metric": "",
+    "embeddings_file": ""
 }
 
 mean_searcher = MeanSearcher()
@@ -76,6 +73,46 @@ async def upload_pdf(
     Upload a PDF file and chunk it according to the specified strategy
     """
     try:
+        config_id = f"{file.filename}_{chunking_strategy}_{token_size}_{sentence_size}_{paragraph_size}_{page_size}_{embedding_model}"
+        
+        # Load existing configurations if any
+        config_file = "data/current_document.json"
+        configs = {}
+        if os.path.exists(config_file):
+            with open(config_file, "r") as f:
+                configs = json.load(f)
+        
+        # Check if we have embeddings for this configuration
+        if config_id in configs:
+            # Load existing embeddings
+            embeddings_file = configs[config_id]["embeddings_file"]
+            with open(embeddings_file, "r") as f:
+                chunk_embeddings = json.load(f)
+                chunks = [item["chunk"] for item in chunk_embeddings]
+                embeddings = [item["embeddings"] for item in chunk_embeddings]
+                
+                # Load the PDF to get pages
+                pdf_content = await file.read()
+                pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
+                pages = [page.extract_text() for page in pdf_reader.pages]
+                full_text = "\n\n".join(pages)
+                
+                current_document.update({
+                    "text": full_text,
+                    "pages": pages,
+                    "chunks": chunks,
+                    "chunking_strategy": chunking_strategy,
+                    "embedding_model": embedding_model,
+                    "embeddings": embeddings,
+                    "similarity_metric": similarity_metric,
+                    "embeddings_file": embeddings_file  # Store the embeddings file path
+                })
+                
+                return {
+                    "message": f"Loaded existing embeddings for configuration. Found {len(chunks)} chunks.",
+                    "chunk_count": len(chunks)
+                }
+            
         pdf_content = await file.read()
         pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
         
@@ -100,37 +137,40 @@ async def upload_pdf(
 
         embeddings = EmbeddingGenerator.get_embeddings(chunks, embedding_model)
 
-        current_document["text"] = full_text
-        current_document["pages"] = pages
-        current_document["chunks"] = chunks
-        current_document["chunking_strategy"] = chunking_strategy
-        current_document["embedding_model"] = embedding_model
-        current_document["embeddings"] = embeddings
-        current_document["similarity_metric"] = similarity_metric
+        current_document.update({
+            "text": full_text,
+            "pages": pages,
+            "chunks": chunks,
+            "chunking_strategy": chunking_strategy,
+            "embedding_model": embedding_model,
+            "embeddings": embeddings,
+            "similarity_metric": similarity_metric,
+        })
         
-        # Save to disk for persistence
-        with open("data/current_document.json", "w") as f:
-            doc_data = {
-                "filename": file.filename,
-                "chunking_strategy": chunking_strategy,
-                "chunk_count": len(chunks),
-                "token_size": token_size if chunking_strategy == "tokens" else None,
-                "embedding_model": embedding_model,
-                "similarity_metric": similarity_metric,
-            }
-            json.dump(doc_data, f)
-
-        with open("data/chunk_embeddings.json", "w") as f:
-            chunk_embeddings = []
-            for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-                chunk_embeddings.append({
-                    "chunk": chunk,
-                    "chunk_no": i+1,
-                    "embeddings": embedding
-                })
+        # Save embeddings to a unique file
+        embeddings_file = f"data/embeddings_{config_id}.json"
+        chunk_embeddings = []
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+            chunk_embeddings.append({
+                "chunk": chunk,
+                "chunk_no": i+1,
+                "embeddings": embedding
+            })
+        with open(embeddings_file, "w") as f:
             json.dump(chunk_embeddings, f)
 
+        # Update the config to include the embeddings file path
+        configs[config_id] = {
+            "embeddings_file": embeddings_file,
+            "chunking_strategy": chunking_strategy,
+            "embedding_model": embedding_model,
+            "similarity_metric": similarity_metric,
+        }
         
+        # Save the updated configurations
+        with open(config_file, "w") as f:
+            json.dump(configs, f)
+
         return {
             "message": f"PDF processed with {chunking_strategy} chunking strategy and {embedding_model} model. Created {len(chunks)} chunks.",
             "chunk_count": len(chunks)
@@ -208,7 +248,7 @@ async def search_mean(
         
         if results:
             top_result = results[0]
-            answer = f"Found {len(results)} relevant chunks. Most relevant (score: {top_result['score']:.2f}) is from document '{top_result['document']}'."
+            answer = f"Found {len(results)} relevant chunks."
         else:
             answer = "No relevant results found for your query."
         
@@ -340,7 +380,7 @@ def query_deep_learning_model(query: str, num_chunks: int = 5):
             k=num_chunks
         )
         
-        top_chunk_texts = [chunk for _, (chunk, _) in top_chunks]
+        top_chunk_texts = [(chunk, chunk_number) for chunk_number, (chunk, _) in top_chunks]
         context = format_context_for_llm(top_chunk_texts)
         llm_response = generate_llm_response(query, context)
         
@@ -381,7 +421,7 @@ async def visualize_embeddings(method: str = Query("pca"), k: int = Query(5)):
         query_emb = np.array(query_embedding)
         response_emb = EmbeddingGenerator.get_embeddings([llm_response], current_document["embedding_model"])[0]
 
-        top_chunk_indices = np.argsort(similarity_scores)[-k:] + 1  
+        top_chunk_indices = np.argsort(similarity_scores)[-k:]
 
         if method.lower() == "pca":
             img_base64 = PCA_visualization(chunks_embs, query_emb, response_emb, top_chunk_indices)

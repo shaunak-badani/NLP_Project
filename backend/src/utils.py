@@ -12,7 +12,10 @@ def format_context_for_llm(chunks: List[str]) -> str:
     """
     Format chunks as context for the LLM.
     """
-    context = "\n\n---\n\n".join(chunks)
+    context = ""
+    for chunk, chunk_no in chunks:
+        context += f"Chunk {chunk_no+1}:\n{chunk}\n\n"
+
     return f"CONTEXT:\n{context}\n\nBased on the above context, "
 
 def generate_llm_response(query: str, context: str) -> str:
@@ -27,8 +30,17 @@ def generate_llm_response(query: str, context: str) -> str:
 
         client = genai.Client(api_key=api_key)
         prompt = f"""{context}
-        
-Based purely on the above context, answer the following question: {query}"""
+
+Based purely on the above context:
+
+1. Answer the following question: {query}
+
+2. After your answer, provide a detailed relevance analysis:
+   - List each chunk number that was used to answer the question
+   - Assign a relevance score (0-100%) to each chunk. Be strict with the relevance score and give appropriate scores.
+   - Ensure the sum of all relevance scores equals 100%
+   - Note: Chunks can have 0% (not used) or 100% (fully used) relevance
+"""
         
         response = client.models.generate_content(
             model="gemini-2.0-flash", contents=prompt

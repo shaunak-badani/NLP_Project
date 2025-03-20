@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import BackdropWithSpinner from "@/components/ui/backdropwithspinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const Mean = () => {
     const [isLoading, setLoading] = useState(false);
@@ -234,19 +235,25 @@ const Mean = () => {
                     {results.length > 0 && (
                         <div className="mt-4">
                             <h4 className="font-medium mb-2">Retrieved Chunks</h4>
-                            <div className="space-y-3">
+                            <Accordion type="single" collapsible className="w-full">
                                 {results.map((result, index) => (
-                                    <div key={index} className="p-3 border rounded bg-white">
-                                        <div className="flex justify-between mb-1">
-                                            <span className="font-medium">Chunk {result.chunk}/{result.total_chunks}</span>
-                                            <span className="text-sm bg-blue-100 px-2 py-0.5 rounded">
-                                                Score: {(result.score * 100).toFixed(1)}%
-                                            </span>
-                                        </div>
-                                        <p className="text-sm whitespace-pre-line">{result.snippet}</p>
-                                    </div>
+                                    <AccordionItem key={index} value={`chunk-${index}`}>
+                                        <AccordionTrigger>
+                                            <div className="flex items-center justify-between w-full">
+                                                <span>Chunk {result.chunk}</span>
+                                                <span className="text-sm bg-blue-100 px-2 py-0.5 rounded">
+                                                    Score: {(result.score * 100).toFixed(1)}%
+                                                </span>
+                                            </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent>
+                                            <div className="space-y-2">
+                                                <p className="whitespace-pre-line">{result.snippet}</p>
+                                            </div>
+                                        </AccordionContent>
+                                    </AccordionItem>
                                 ))}
-                            </div>
+                            </Accordion>
                         </div>
                     )}
                 </div>
