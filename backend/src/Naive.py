@@ -41,18 +41,21 @@ def clean_text(text, use_stemming=True):
         
     return ' '.join(words)
 
-def find_relevant_bit(text, query, max_len=200):
-    """Find a piece of text that matches the query"""
+def find_relevant_bit(text, query, max_len=10000):  # Set to a very high value
+    """Return the full chunk content"""
+    # First try to see if there are any matching paragraphs (for highlighting purposes)
     paragraphs = [p.strip() for p in text.split('\n') if p.strip()]
     search_words = set(query.lower().split())
     
-    for para in paragraphs:
-        if any(word in para.lower() for word in search_words):
-            if len(para) <= max_len:
-                return para
-            return para[:max_len] + "..."
+    # Check if there are matches
+    has_matches = any(any(word in para.lower() for word in search_words) for para in paragraphs)
     
-    return text[:max_len] + "..." if text else ""
+    # If there are matches or not, return the full text (only truncate if extremely long)
+    if len(text) <= max_len:
+        return text
+    
+    # Only truncate if extremely long
+    return text[:max_len] + "... [truncated for display]"
 
 def extract_text_from_pdf(pdf_path):
     """Extract text from a PDF file"""
@@ -98,40 +101,56 @@ class ChunkedTextSearcher:
     def add_pdf(self, name, pdf_path):
         """Add a PDF document and split it into chunks"""
         try:
-            text, page_texts = extract_text_from_pdf(pdf_path)
-            
-            if not text:
-                print(f"Error: Could not extract text from {pdf_path}")
-                return False
+            with open(pdf_path, 'rb') as file:
+                reader = PyPDF2.PdfReader(file)
+                text = ""
+                page_texts = []
                 
-            self.docs[name] = text
-            self.pages[name] = page_texts
-            
-            if name not in self.doc_names:
-                self.doc_names.append(name)
-            
-            # Split into chunks based on selected method
-            if self.chunking_method == "tokens":
-                doc_chunks = chunk_by_tokens(text, token_size=self.chunk_size, overlap=self.chunk_overlap)
-            elif self.chunking_method == "sentence":
-                doc_chunks = chunk_by_sentence(text)
-            elif self.chunking_method == "paragraph":
-                doc_chunks = chunk_by_paragraph(text)
-            elif self.chunking_method == "page":
-                doc_chunks = page_texts
-            else:
-                print(f"Unknown chunking method: {self.chunking_method}, using tokens")
-                doc_chunks = chunk_by_tokens(text, token_size=self.chunk_size, overlap=self.chunk_overlap)
+                for page in reader.pages:
+                    page_text = page.extract_text()
+                    
+                    # Improve paragraph detection
+                    if page_text:
+                        # Add markers for headers to help paragraph detection
+                        page_text = re.sub(r'([A-Z][a-z]+(?:\s+[A-Z][a-zA-Z]*)+)(\n)', r'\1\n\n', page_text)
+                    
+                    page_texts.append(page_text)
+                    text += page_text + "\n\n"
+                    
+                if not text:
+                    print(f"Error: Could not extract text from {pdf_path}")
+                    return False
+                    
+                self.docs[name] = text
+                self.pages[name] = page_texts
                 
-            self.chunks[name] = doc_chunks
-            
-            # Update chunk info list
-            self._update_chunk_info()
-            
-            self.chunk_vectors = None
-            
-            print(f"Added PDF '{name}' with {len(doc_chunks)} chunks using {self.chunking_method} chunking.")
-            return True
+                if name not in self.doc_names:
+                    self.doc_names.append(name)
+                
+                # Split into chunks based on selected method
+                if self.chunking_method == "tokens":
+                    doc_chunks = chunk_by_tokens(text, token_size=self.chunk_size, overlap=self.chunk_overlap)
+                elif self.chunking_method == "sentence":
+                    doc_chunks = chunk_by_sentence(text, size=getattr(self, 'sentences_per_chunk', 1))
+                elif self.chunking_method == "paragraph":
+                    # For paragraph chunking, apply special pre-processing
+                    modified_text = re.sub(r'([A-Z][a-z]+(?:\s+[A-Z][a-zA-Z]*)+)(\n)', r'\n\n\1\n\n', text)
+                    doc_chunks = chunk_by_paragraph(modified_text)
+                elif self.chunking_method == "page":
+                    doc_chunks = page_texts
+                else:
+                    print(f"Unknown chunking method: {self.chunking_method}, using tokens")
+                    doc_chunks = chunk_by_tokens(text, token_size=self.chunk_size, overlap=self.chunk_overlap)
+                    
+                self.chunks[name] = doc_chunks
+                
+                # Update chunk info list
+                self._update_chunk_info()
+                
+                self.chunk_vectors = None
+                
+                print(f"Added PDF '{name}' with {len(doc_chunks)} chunks using {self.chunking_method} chunking.")
+                return True
         except Exception as e:
             print(f"Error processing PDF {name}: {str(e)}")
             return False

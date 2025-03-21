@@ -12,7 +12,7 @@ from embedding import EmbeddingGenerator
 from similarity_metrics import SimilarityCalculator
 from utils import format_context_for_llm, generate_llm_response
 from visualization import PCA_visualization, tSNE_visualization, UMAP_visualization
-from naive import ChunkedTextSearcher
+from Naive import ChunkedTextSearcher
 from mean_search import MeanSearcher
 
 app = FastAPI(root_path='/api')
@@ -195,6 +195,15 @@ async def upload_mean(
     try:
         content = await file.read()
         
+        # Print debug info
+        print(f"DEBUG: Upload-mean with params:")
+        print(f"  - chunking_method: {chunking_method}")
+        print(f"  - chunk_size: {chunk_size}")
+        print(f"  - overlap: {overlap}")
+        print(f"  - sentences_per_chunk: {sentences_per_chunk}")
+        
+        mean_searcher = MeanSearcher()
+        
         if file.filename.lower().endswith('.pdf'):
             # Save PDF to a temporary file
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
@@ -221,6 +230,9 @@ async def upload_mean(
         }
     
     except Exception as e:
+        print(f"ERROR in upload-mean: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
         return {"message": f"Error: {str(e)}"}
 
 @app.get("/mean")
@@ -228,7 +240,6 @@ def query_mean_model(query: str):
     """
     Query endpoint for the mean model
     """
-    # Pass query to some function
     answer = f"Response to the mean query : {query}"
     return {"answer": answer}
 
@@ -277,6 +288,7 @@ async def upload_naive(
     chunking_method: str = Form("tokens"),
     chunk_size: int = Form(256),
     overlap: int = Form(20),
+    sentences_per_chunk: int = Form(1),
     similarity_metric: str = Form("cosine"),
 ):
     """
@@ -288,6 +300,7 @@ async def upload_naive(
         naive_searcher.chunking_method = chunking_method
         naive_searcher.chunk_size = chunk_size
         naive_searcher.chunk_overlap = overlap
+        naive_searcher.sentences_per_chunk = sentences_per_chunk
         
         # Read the file
         content = await file.read()
