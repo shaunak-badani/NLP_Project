@@ -14,3 +14,5 @@ services:
       - HF_HOME=/app/hf_cache
     volumes:
       - ./hf_cache:/app/hf_cache
+    env_file:
+      - ./backend/.env
