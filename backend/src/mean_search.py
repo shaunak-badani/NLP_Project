@@ -30,30 +30,129 @@ class MeanSearcher:
         self.count_matrix = None  # Store bag-of-words counts
     
     def preprocess_text(self, text: str) -> str:
-        """Very simple text preprocessing - just lowercase and remove punctuation"""
-        text = text.lower()
+        """
+        Enhanced text preprocessing for PDF content
+        """
+        # First, normalize line endings
+        text = re.sub(r'\r\n', '\n', text)
         
-        text = re.sub(r'[^\w\s]', ' ', text)
+        # Normalize spacing
+        text = re.sub(r' +', ' ', text)
         
-        text = re.sub(r'\s+', ' ', text).strip()
+        # Add double newlines before headings (likely section titles)
+        text = re.sub(r'([a-z])\n([A-Z][a-zA-Z ]+)(\n)', r'\1\n\n\2\3', text)
         
         return text
     
     def chunk_by_paragraph(self, text: str) -> List[str]:
-        """Split text into paragraphs"""
-        paragraphs = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip()]
+        """
+        Vastly improved paragraph detection specifically for PDF content
+        """
+        print(f"DEBUG: chunk_by_paragraph input length: {len(text)} characters")
+        
+        # First normalize text
+        text = self.preprocess_text(text)
+        
+        # Method 1: Standard paragraph detection
+        paragraphs1 = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip()]
+        print(f"DEBUG: Standard paragraph detection found {len(paragraphs1)} paragraphs")
+        
+        # Method 2: Enhanced detection looking for section headers
+        enhanced_text = re.sub(r'([A-Z][a-zA-Z ]*(?:[a-z]|[A-Z][a-z]+)[a-zA-Z ]*)\n', r'\n\n\1\n\n', text)
+        paragraphs2 = [p.strip() for p in re.split(r'\n\s*\n', enhanced_text) if p.strip()]
+        print(f"DEBUG: Enhanced paragraph detection found {len(paragraphs2)} paragraphs")
+        
+        # Use whichever method found more paragraphs
+        paragraphs = paragraphs1 if len(paragraphs1) >= len(paragraphs2) else paragraphs2
+        
+        # If still only one paragraph, force split into smaller chunks
+        if len(paragraphs) <= 1 and len(text) > 500:
+            # If the text is very long but has no proper paragraph breaks, 
+            # split by sentence and then group sentences
+            import nltk
+            try:
+                nltk.data.find('tokenizers/punkt')
+            except LookupError:
+                nltk.download('punkt', quiet=True)
+            from nltk.tokenize import sent_tokenize
+            
+            sentences = sent_tokenize(text)
+            print(f"DEBUG: Document has {len(sentences)} sentences")
+            
+            # Group sentences into pseudo-paragraphs (5 sentences per paragraph)
+            paragraphs = []
+            for i in range(0, len(sentences), 5):
+                paragraph = " ".join(sentences[i:i + 5])
+                paragraphs.append(paragraph)
+            
+            print(f"DEBUG: Created {len(paragraphs)} forced paragraphs from sentences")
+        
+        # As a final failsafe, if we still have no good paragraphs, split by fixed length
+        if len(paragraphs) <= 1 and len(text) > 500:
+            print("DEBUG: Using fixed length chunking as fallback")
+            words = text.split()
+            paragraphs = []
+            
+            for i in range(0, len(words), 100):  # ~100 words per paragraph as fallback
+                paragraph = " ".join(words[i:i + 100])
+                paragraphs.append(paragraph)
+        
+        # Print sample of the first paragraph
+        if paragraphs:
+            print(f"DEBUG: First paragraph sample: {paragraphs[0][:100]}...")
+        
         return paragraphs
     
     def chunk_by_sentence(self, text: str, sentences_per_chunk: int = 3) -> List[str]:
-        """Split text into chunks of N sentences"""
-        sentences = sent_tokenize(text)
-        chunks = []
+        """
+        Completely rewritten sentence chunking for better reliability
+        """
+        print(f"DEBUG: chunk_by_sentence with {sentences_per_chunk} sentences per chunk")
         
+        # Ensure NLTK punkt is downloaded
+        import nltk
+        try:
+            nltk.data.find('tokenizers/punkt')
+        except LookupError:
+            nltk.download('punkt', quiet=True)
+        from nltk.tokenize import sent_tokenize
+        
+        # Process text to improve sentence detection
+        text = self.preprocess_text(text)
+        
+        # First try standard sentence tokenization
+        sentences = sent_tokenize(text)
+        print(f"DEBUG: Detected {len(sentences)} sentences with NLTK tokenizer")
+        
+        # If NLTK doesn't find many sentences, try a simple regex approach
+        if len(sentences) <= 5 and len(text) > 500:
+            print("DEBUG: Few sentences detected, trying regex approach")
+            # Simple regex to split on sentence endings
+            regex_sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
+            
+            if len(regex_sentences) > len(sentences):
+                sentences = regex_sentences
+                print(f"DEBUG: Regex found {len(sentences)} sentences")
+        
+        # Remove very short sentences (likely artifacts)
+        sentences = [s for s in sentences if len(s) > 10]
+        print(f"DEBUG: After filtering, {len(sentences)} valid sentences remain")
+        
+        # Group sentences into chunks
+        chunks = []
         for i in range(0, len(sentences), sentences_per_chunk):
-            chunk = ' '.join(sentences[i:i + sentences_per_chunk])
+            chunk = " ".join(sentences[i:i + sentences_per_chunk])
             chunks.append(chunk)
         
+        print(f"DEBUG: Created {len(chunks)} chunks from sentences")
+        
+        # As a failsafe, if we have no chunks, return the original text as one chunk
+        if not chunks and text.strip():
+            print("DEBUG: No chunks created, returning original text as one chunk")
+            return [text]
+        
         return chunks
+    
     
     def chunk_by_fixed_size(self, text: str, chunk_size: int = 200, overlap: int = 50) -> List[str]:
         """Split text into overlapping chunks of approximately fixed size"""
@@ -70,21 +169,25 @@ class MeanSearcher:
         return chunks
     
     def add_document(self, doc_name: str, content: str, chunking_method: str = 'paragraph', 
-                    chunk_size: int = 200, overlap: int = 50, sentences_per_chunk: int = 3) -> int:
-        """
-        Add a document and split it into chunks using the specified method
-        Returns the number of chunks created
-        """
+                 chunk_size: int = 200, overlap: int = 50, sentences_per_chunk: int = 1) -> int:
+        """Add a document and split it into chunks using the specified method"""
         self.documents[doc_name] = content
         
         processed_text = self.preprocess_text(content)
         
+        # Add debug print
+        print(f"Using chunking method: {chunking_method}")
+        
         if chunking_method == 'paragraph':
             chunks = self.chunk_by_paragraph(processed_text)
         elif chunking_method == 'sentence':
+            # Use custom sentence chunker to ensure proper handling
             chunks = self.chunk_by_sentence(processed_text, sentences_per_chunk)
-        else:  
+        else:  # fixed_size
             chunks = self.chunk_by_fixed_size(processed_text, chunk_size, overlap)
+        
+        # More debug info
+        print(f"Created {len(chunks)} chunks for document {doc_name}")
         
         # Store the chunks
         self.chunks[doc_name] = chunks
@@ -105,27 +208,48 @@ class MeanSearcher:
         return len(chunks)
     
     def add_pdf(self, doc_name: str, pdf_path: str, chunking_method: str = 'paragraph',
-               chunk_size: int = 200, overlap: int = 50, sentences_per_chunk: int = 3) -> int:
+           chunk_size: int = 200, overlap: int = 50, sentences_per_chunk: int = 3) -> int:
         """
-        Extract text from a PDF and add it as a document
-        Returns the number of chunks created
+        Enhanced PDF text extraction
         """
         try:
+            print(f"DEBUG: add_pdf with chunking_method={chunking_method}, sentences_per_chunk={sentences_per_chunk}")
+            
             with open(pdf_path, 'rb') as file:
                 reader = PyPDF2.PdfReader(file)
-                text = ""
+                print(f"DEBUG: PDF has {len(reader.pages)} pages")
                 
-                for page in reader.pages:
+                text = ""
+                page_texts = []
+                
+                for i, page in enumerate(reader.pages):
                     page_text = page.extract_text()
+                    page_texts.append(page_text)
+                    
                     if page_text:
-                        text += page_text + "\n\n"
-            
-            return self.add_document(
-                doc_name, text, chunking_method, chunk_size, overlap, sentences_per_chunk
-            )
-            
+                        # Add explicit paragraph markers for better detection
+                        page_text = re.sub(r'([.!?])\s+([A-Z])', r'\1\n\n\2', page_text)
+                        text += page_text + "\n\n"  # Add explicit paragraph breaks between pages
+                    
+                    print(f"DEBUG: Page {i+1} has {len(page_text) if page_text else 0} characters")
+                
+                print(f"DEBUG: Total text extracted: {len(text)} characters")
+                
+                # Create a version of text with enhanced formatting for debugging
+                enhanced_text = re.sub(r'\n', '<NEWLINE>\n', text[:1000])
+                print(f"DEBUG: Text sample with newlines marked: {enhanced_text[:500]}...")
+                
+                # Call add_document with the extracted text
+                result = self.add_document(
+                    doc_name, text, chunking_method, chunk_size, overlap, sentences_per_chunk
+                )
+                
+                return result
+                
         except Exception as e:
-            print(f"Error processing PDF {pdf_path}: {str(e)}")
+            print(f"ERROR processing PDF: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
             return 0
     
     def build_index(self):

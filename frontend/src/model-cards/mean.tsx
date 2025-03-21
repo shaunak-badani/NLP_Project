@@ -17,7 +17,7 @@ const Mean = () => {
     const [uploadStatus, setUploadStatus] = useState("");
     const [chunkSize, setChunkSize] = useState(200);
     const [overlap, setOverlap] = useState(50);
-    const [sentencesPerChunk, setSentencesPerChunk] = useState(3);
+    const [sentencesPerChunk, setSentencesPerChunk] = useState(1);
     const [numResults, setNumResults] = useState(3);
     const [results, setResults] = useState<any[]>([]);
 
@@ -56,6 +56,7 @@ const Mean = () => {
         }
     }
 
+    // In src/model-cards/mean.tsx
     const handleFileUpload = async () => {
         if (!selectedFile) {
             setUploadStatus("Please select a file first.");
@@ -65,10 +66,20 @@ const Mean = () => {
         setLoading(true);
         const formData = new FormData();
         formData.append("file", selectedFile);
+        
+        // Make sure these parameters are explicitly set        
         formData.append("chunking_method", chunkingMethod);
         formData.append("chunk_size", chunkSize.toString());
         formData.append("overlap", overlap.toString());
         formData.append("sentences_per_chunk", sentencesPerChunk.toString());
+
+
+        console.log("Uploading with:", {
+            method: chunkingMethod,
+            sentences: sentencesPerChunk,
+            chunk_size: chunkSize,
+            overlap: overlap
+        });
 
         try {
             const response = await backendClient.post(`/upload-mean`, formData, {

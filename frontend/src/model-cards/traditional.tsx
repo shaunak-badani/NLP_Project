@@ -17,7 +17,7 @@ const Traditional = () => {
     const [uploadStatus, setUploadStatus] = useState("");
     const [chunkSize, setChunkSize] = useState(200);
     const [overlap, setOverlap] = useState(50);
-    const [sentencesPerChunk, setSentencesPerChunk] = useState(3);
+    const [sentencesPerChunk, setSentencesPerChunk] = useState(1);
     const [numResults, setNumResults] = useState(3);
     const [results, setResults] = useState<any[]>([]);
 
