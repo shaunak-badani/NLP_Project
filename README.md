@@ -87,6 +87,11 @@ fastapi dev src/main.py
 npm run dev
 ```
 
+3. Training the model
+```bash
+python scripts/model.py
+```
+
 ## Usage Guide
 
 ### Document Upload and Configuration
@@ -128,7 +133,6 @@ npm run dev
   - Information completeness
   - Response accuracy
   - And more evaluation criteria
-
 
 # Ethics Statement
 
