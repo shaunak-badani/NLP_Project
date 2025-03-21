@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import axios from "axios";
 import { Textarea } from "@/components/ui/textarea";
 import BackdropWithSpinner from "@/components/ui/backdropwithspinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import backendClient from "@/components/backendClient";
 
 const Traditional = () => {
     const [isLoading, setLoading] = useState(false);
@@ -20,12 +20,11 @@ const Traditional = () => {
     const [sentencesPerChunk, setSentencesPerChunk] = useState(3);
     const [numResults, setNumResults] = useState(3);
     const [results, setResults] = useState<any[]>([]);
-    const [serverUrl, _] = useState("http://localhost:8000");
 
     const handleQuery = async(query: string) => {
         setLoading(true);
         try {
-            const response = await axios.get(`${serverUrl}/search-naive`, {
+            const response = await backendClient.get(`/search-naive`, {
                 params: {
                     query: query,
                     num_results: numResults,
@@ -72,7 +71,7 @@ const Traditional = () => {
         formData.append("sentences_per_chunk", sentencesPerChunk.toString());
 
         try {
-            const response = await axios.post(`${serverUrl}/upload-naive`, formData, {
+            const response = await backendClient.post(`/upload-naive`, formData, {
                 headers: {
                     "Content-Type": "multipart/form-data",
                 }

@@ -24,7 +24,8 @@ origins = [
     "http://localhost:5173",
     "http://vcm-45508.vm.duke.edu",
     "http://localhost:5174",
-    "http://localhost:8080"
+    "http://localhost:8080",
+    "http://localhost"
 ]
 
 app.add_middleware(

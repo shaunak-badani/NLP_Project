@@ -13,6 +13,7 @@ try:
 except LookupError:
     print("Downloading required NLTK data...")
     nltk.download('punkt', quiet=True)
+    nltk.download('punkt_tab', quiet=True)
 
 class MeanSearcher:
     """A basic bag-of-words search implementation - first generation NLP approach"""

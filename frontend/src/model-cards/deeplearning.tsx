@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import axios from "axios";
 import { Textarea } from "@/components/ui/textarea";
 import BackdropWithSpinner from "@/components/ui/backdropwithspinner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import backendClient from "@/components/backendClient";
 
 interface Chunk {
     chunk_number: number;
@@ -45,7 +45,7 @@ const DeepLearning = () => {
     const handlePromptInput = async(query: string) => {
         setLoading(true);
         try {
-            const response = await axios.get("http://localhost:8000/api/deep-learning", {
+            const response = await backendClient.get("/deep-learning", {
                 params: {
                     query: query,
                     num_chunks: numChunks
@@ -90,7 +90,7 @@ const DeepLearning = () => {
         formData.append("similarity_metric", similarityMetric);
 
         try {
-            const response = await axios.post("http://localhost:8000/api/upload-pdf", formData, {
+            const response = await backendClient.post("/upload-pdf", formData, {
                 headers: {
                     "Content-Type": "multipart/form-data",
                 }
@@ -107,17 +107,17 @@ const DeepLearning = () => {
         setLoading(true);
         try {
             // Call the API for PCA, t-SNE, and UMAP visualizations separately
-            const pcaResponse = await axios.get("http://localhost:8000/api/visualize-embeddings", {
+            const pcaResponse = await backendClient.get("/visualize-embeddings", {
                 params: { method: "pca", k: numChunks }, 
                 responseType: 'json',
             });
     
-            const tsneResponse = await axios.get("http://localhost:8000/api/visualize-embeddings", {
+            const tsneResponse = await backendClient.get("/visualize-embeddings", {
                 params: { method: "tsne", k: numChunks }, 
                 responseType: 'json',
             });
     
-            const umapResponse = await axios.get("http://localhost:8000/api/visualize-embeddings", {
+            const umapResponse = await backendClient.get("/visualize-embeddings", {
                 params: { method: "umap", k: numChunks }, 
                 responseType: 'json',
             });
