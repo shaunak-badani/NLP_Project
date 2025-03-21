@@ -1,5 +1,7 @@
 # RAG Evaluation Application
 
+> The application has been deployed and can be found [here](http://vcm-45508.vm.duke.edu/).
+
 ## Overview
 This application provides an interactive environment for testing various RAG configurations and visualizing their performance, making RAG systems more explainable and transparent.
 
