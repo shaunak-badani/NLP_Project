@@ -10,21 +10,19 @@ function App() {
   return (
     <>
     <div>
-      <div className="header p-6 text-xl border-b">AppName</div>
+      <div className="header p-6 text-xl border-b">RAG Analyzer</div>
     <div className="min-h-screen p-8 pb-8 sm:p-8">      
       <main className="max-w-4xl mx-auto flex flex-col gap-16">
       <div>
       <h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
-        Super catchy tagline!
+      Making RAG Retrieval Transparent & Explainable
       </h1>
       <p className="leading-7 [&:not(:first-child)]:mt-6 m-6 sm:m-6">
-        Once upon a time, in a far-off land, there was a very lazy king who
-        spent all day lounging on his throne. One day, his advisors came to him
-        with a problem: the kingdom was running out of money (insert description)
+      How to decide whether your RAG pipeline is truly optimized? RAG analyzer helps you visually analyze chunking strategies and embedding models to understand how well your system retrieves relevant information. Compare different methods and gain insights into which configuration works best for your data!
       </p>
       <Tabs defaultValue="mean">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="mean">Mean model</TabsTrigger>
+          <TabsTrigger value="mean">Naive model</TabsTrigger>
           <TabsTrigger value="traditional">Traditional Model</TabsTrigger>
           <TabsTrigger value="deep-learning">Deep Learning Model</TabsTrigger>
         </TabsList>

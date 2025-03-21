@@ -1,0 +1,18 @@
+services:
+  frontend:
+    container_name: frontend
+    build:
+      context: ./frontend
+    ports:
+      - "80:80"
+
+  backend:
+    container_name: backend
+    build:
+      context: ./backend
+    environment:
+      - HF_HOME=/app/hf_cache
+    volumes:
+      - ./hf_cache:/app/hf_cache
+    env_file:
+      - ./backend/.env

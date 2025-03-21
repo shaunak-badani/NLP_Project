@@ -1,2 +1,7 @@
 **/__pycache__
 **/*.lock
+.venv/
+.vscode/
+.DS_Store
+.env
+node_modules/
