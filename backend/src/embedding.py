@@ -3,7 +3,7 @@ from transformers import BertModel, BertTokenizer, RobertaModel, RobertaTokenize
 from typing import List, Tuple
 
 class EmbeddingGenerator:
-    sentence_transformer = SentenceTransformer("all-MiniLM-L6-v2")
+    sentence_transformer = SentenceTransformer("all-MiniLM-L6-v2", device = "cpu")
     bert_tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
     bert_model = BertModel.from_pretrained("bert-base-uncased")
     roberta_tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
